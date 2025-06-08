@@ -129,7 +129,7 @@ impl HttpClient {
     /// 
     /// This method allows configuring a custom rate limiter for specialized
     /// rate limiting needs beyond the default settings. This is useful for
-    /// testing scenarios or when specific API limit policies need to be respected.
+    /// testing scenarios or when specific rate limiting policies need to be respected.
     /// 
     /// # Arguments
     /// * `limiter` - The custom rate limiter to use
@@ -145,12 +145,11 @@ impl HttpClient {
     /// # use std::time::Duration;
     /// # async {
     /// let client = HttpClient::new(Duration::from_secs(10))?;
-    /// let custom_limiter = Arc::new(RateLimiter::new(30, 60000, 5));
+    /// let custom_limiter = Arc::new(RateLimiter::new(50, 60000, 10));
     /// let client_with_limiter = client.with_rate_limiter(custom_limiter);
     /// # Ok::<(), anyhow::Error>(())
     /// # };
     /// ```
-    #[allow(dead_code)]
     pub fn with_rate_limiter(mut self, limiter: Arc<RateLimiter>) -> Self {
         self.rate_limiter = limiter;
         self

@@ -52,7 +52,7 @@ This document tracks the implementation status of the Sentri project based on ou
 ### Core Module
 - ⏳ Comprehensive error handling for all edge cases
 - ✅ Improved rate limiting implementation
-- ⏳ Documentation of public API functions
+- ✅ Documentation of core module public API functions
 
 ### DNS Module
 - ⏳ Optimizing cache size based on expected workload
@@ -74,7 +74,8 @@ This document tracks the implementation status of the Sentri project based on ou
 ### Rust Best Practices
 - 🔄 Review and improve error context throughout codebase
 - 🔄 Replace any remaining unwrap()/expect() calls with proper error handling
-- 🔄 Add documentation for all public API functions
+- ✅ Add documentation for validation, retry, and XML module public API functions
+- ⏳ Add documentation for remaining public API functions
 - 🔄 Review for unnecessary allocations and optimize
 
 ### MDI-Specific Improvements
@@ -96,9 +97,11 @@ This document tracks the implementation status of the Sentri project based on ou
 - 🔄 Set up code coverage metrics
 
 ### Documentation
-- 🔄 Add rustdoc comments to all public functions
-- 🔄 Create detailed examples for each module
-- 🔄 Document complex algorithms and optimizations
+- ⏳ Add rustdoc comments to all public functions
+- ✅ Create detailed examples for validation, retry, and XML modules
+- ⏳ Create detailed examples for remaining modules
+- ✅ Document XML parsing and validation algorithms
+- 🔄 Document remaining complex algorithms and optimizations
 - 🔄 Enhance README with more detailed usage information
 
 ## Priority Items

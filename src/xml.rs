@@ -1,13 +1,27 @@
 //! XML processing for Microsoft Autodiscover services
 //!
-//! This module provides functionality for handling XML in the Microsoft Autodiscover workflow:
-//! - Generation of SOAP requests for federation information
-//! - Parsing of federation responses to extract domain lists
-//! - Validation of XML structure and namespaces
-//! - Special test modes for improved testability
+//! This module provides comprehensive XML processing capabilities for interacting with
+//! Microsoft Autodiscover services to discover federation information and MDI instances:
 //!
-//! The implementation focuses on robustness when handling potentially malformed or
-//! unexpected XML responses from external services.
+//! - Generation of standards-compliant SOAP requests for federation information
+//! - Robust parsing of federation responses with extensive error handling
+//! - Namespace-aware XML validation with support for various Microsoft schemas
+//! - Defense against malformed or unexpected XML responses from external services
+//! - Special test modes for reliable integration testing
+//!
+//! # Security Features
+//!
+//! - Strict validation of XML structure to prevent XXE and other XML-based attacks
+//! - Namespace validation to ensure only expected schemas are processed
+//! - Robust error handling to prevent processing invalid or malicious XML
+//! - Domain validation on extracted domains to prevent downstream security issues
+//!
+//! # Performance Considerations
+//!
+//! - Uses quick_xml for memory-efficient streaming XML processing
+//! - Minimizes memory allocations by using references where possible
+//! - Implements early validation to fail fast on invalid responses
+//! - Uses HashSet for O(1) lookups of namespaces and required elements
 
 use std::collections::HashSet;
 use anyhow::{Result, Context, anyhow};
@@ -119,12 +133,57 @@ impl XmlParser {
     }
 
     /// Parses an XML Federation response to extract domain names
-    /// 
-    /// # Arguments
-    /// * `xml_content` - The XML string containing federation information
-    /// 
-    /// # Returns
-    /// * `Result<FederationInfo>` - Federation info containing discovered domains or an error
+/// 
+/// This method performs robust parsing of Microsoft Autodiscover SOAP responses
+/// to extract federation domains from GetFederationInformation responses. It handles
+/// various XML structures, namespaces, and error conditions encountered in real-world
+/// Autodiscover responses.
+/// 
+/// The parser follows these steps:
+/// 1. Validates basic XML structure and required elements
+/// 2. Streams through the XML to find domain elements
+/// 3. Validates each domain for proper format
+/// 4. Collects domains into a FederationInfo object
+/// 
+/// # Arguments
+/// * `xml_content` - The XML string containing federation information
+/// 
+/// # Returns
+/// * `Result<FederationInfo>` - Federation info containing discovered domains or an error
+/// 
+/// # Error conditions
+/// * Empty or malformed XML content
+/// * Missing required elements
+/// * Invalid namespace
+/// * No valid domains found
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use sentri::xml::XmlParser;
+/// # use sentri::core::FederationInfo;
+/// # use anyhow::Result;
+/// #
+/// # fn example() -> Result<()> {
+/// let parser = XmlParser::new();
+/// let xml = r#"<?xml version="1.0"?>
+/// <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+///   <soap:Body>
+///     <GetFederationInformationResponse xmlns="http://schemas.microsoft.com/exchange/2010/Autodiscover">
+///       <Response>
+///         <Domain>example.com</Domain>
+///         <Domain>contoso.com</Domain>
+///       </Response>
+///     </GetFederationInformationResponse>
+///   </soap:Body>
+/// </soap:Envelope>"#;
+/// 
+/// let federation_info = parser.parse_federation_response(xml)?;
+/// assert_eq!(federation_info.domains.len(), 2);
+/// assert!(federation_info.domains.contains(&"example.com".to_string()));
+/// # Ok(())
+/// # }
+/// ```
     pub fn parse_federation_response(&self, xml_content: &str) -> Result<crate::core::FederationInfo> {
         debug!("Parsing federation response XML");
         
