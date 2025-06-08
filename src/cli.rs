@@ -1,12 +1,31 @@
 //! Command-line interface for Sentri MDI discovery tool
 //!
-//! This module defines the CLI structure using clap, providing:
-//! - Command-line argument parsing
-//! - Subcommand definitions
-//! - Help and version information generation
+//! This module provides a robust command-line interface for Microsoft Defender for Identity (MDI)
+//! discovery operations using the clap framework, featuring:
 //!
-//! The CLI supports both single domain checking and batch processing
-//! with configurable concurrency and timeout settings.
+//! - Command-line argument parsing with validation
+//! - Subcommand support for different operation modes
+//! - Security-focused parameter validation and sanitization
+//! - Configurable concurrency, rate limiting, and timeout settings
+//! - Detailed help documentation and version information
+//!
+//! # Security Features
+//!
+//! - Input validation for all domain parameters through the validation module
+//! - Rate limiting to prevent API abuse and respect Microsoft's limits
+//! - Timeout settings to prevent hanging connections
+//! - Secure handling of file paths with proper error messaging
+//!
+//! # Usage Modes
+//!
+//! The CLI supports two primary operation modes:
+//! - Single domain checking for interactive use
+//! - Batch processing for high-volume operations with parallelism controls
+//!
+//! # Error Handling
+//!
+//! Error messages are presented with context for better troubleshooting
+//! and exit codes follow standard conventions (0 for success, non-zero for failures).
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -16,6 +35,28 @@ use std::path::PathBuf;
 /// The CLI uses clap for robust command-line parsing and provides
 /// a subcommand-based interface for different operations. Global options
 /// like concurrency and timeout settings apply to all subcommands.
+/// 
+/// # Fields
+/// 
+/// * `command` - The subcommand to execute (Single or Batch)
+/// * `concurrent_requests` - Number of parallel operations allowed
+/// * `timeout_ms` - HTTP request timeout in milliseconds
+/// 
+/// # Performance Considerations
+/// 
+/// The `concurrent_requests` parameter directly controls the degree of parallelism
+/// and should be tuned based on system resources and API rate limits. Setting this
+/// too high may trigger rate limiting or exhaust system resources.
+/// 
+/// The `timeout_ms` parameter should be set based on expected network conditions.
+/// Too short timeouts may cause false negatives for slow-responding domains,
+/// while too long timeouts can reduce overall throughput.
+/// 
+/// # Security
+/// 
+/// All domain inputs are validated through the validation module which implements
+/// RFC-compliant domain validation and suspicious domain detection to prevent
+/// security issues.
 ///
 /// # Examples
 ///

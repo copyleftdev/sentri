@@ -12,7 +12,6 @@
 
 use anyhow::{Context, Result};
 use dashmap::DashMap;
-use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::{
     path::{Path, PathBuf},

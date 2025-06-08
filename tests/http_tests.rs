@@ -1,5 +1,6 @@
 use anyhow::Result;
 use sentri::http::HttpClient;
+// Import the rate limiter directly from the module
 use sentri::rate_limit::RateLimiter;
 use sentri::retry::RetryConfig;
 use std::sync::Arc;

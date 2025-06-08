@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 use tokio::time::timeout;
 use anyhow::Result;
 
+// Import from the correct module path based on lib.rs exports
 use sentri::rate_limit::RateLimiter;
 
 /// Helper functions to create rate limiters for testing with faster refresh periods

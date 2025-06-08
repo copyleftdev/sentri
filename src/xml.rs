@@ -1,10 +1,21 @@
+//! XML processing for Microsoft Autodiscover services
+//!
+//! This module provides functionality for handling XML in the Microsoft Autodiscover workflow:
+//! - Generation of SOAP requests for federation information
+//! - Parsing of federation responses to extract domain lists
+//! - Validation of XML structure and namespaces
+//! - Special test modes for improved testability
+//!
+//! The implementation focuses on robustness when handling potentially malformed or
+//! unexpected XML responses from external services.
+
 use std::collections::HashSet;
 use anyhow::{Result, Context, anyhow};
 use quick_xml::{events::Event, Reader};
 use tracing::{debug, warn};
 use uuid::Uuid;
 
-/// Parser for SOAP XML requests and responses related to autodiscover
+/// Parser for SOAP XML requests and responses related to Microsoft Autodiscover services
 pub struct XmlParser {
     /// Known valid autodiscover namespaces
     autodiscover_namespaces: HashSet<String>,
@@ -54,6 +65,27 @@ impl XmlParser {
         }
     }
 
+    /// Creates a federation information request SOAP envelope
+    ///
+    /// Generates a properly formatted GetFederationInformation SOAP request
+    /// with the specified domain. This request can be sent to Microsoft's
+    /// Autodiscover service to retrieve federation information.
+    ///
+    /// # Arguments
+    /// * `domain` - The domain to request federation information for
+    ///
+    /// # Returns
+    /// * `String` - A complete SOAP envelope XML string ready to be sent
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sentri::xml::XmlParser;
+    ///
+    /// let parser = XmlParser::new();
+    /// let request = parser.create_federation_request("example.com");
+    /// assert!(request.contains("<Domain>example.com</Domain>"));
+    /// ```
     pub fn create_federation_request(&self, domain: &str) -> String {
         let message_id = Uuid::new_v4();
         

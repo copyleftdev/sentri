@@ -1,3 +1,12 @@
+//! DNS resolution module with caching and rate limiting
+//!
+//! This module provides DNS resolution capabilities with:
+//! - Performance-optimized caching
+//! - Configurable TTL settings
+//! - Built-in rate limiting to prevent overwhelming DNS servers
+//! - Automatic retries with exponential backoff
+//! - Error classification for better failure handling
+
 use anyhow::{Context, Result};
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -8,6 +17,27 @@ use tracing::{debug, warn};
 use crate::retry::{RetryConfig, with_exponential_backoff};
 use crate::rate_limit::{RateLimiter, create_dns_query_limiter};
 
+/// DNS resolver with caching and rate limiting
+///
+/// Provides optimized DNS resolution with:
+/// - System DNS configuration integration
+/// - Performance-tuned caching parameters
+/// - Integrated rate limiting to respect DNS server constraints
+/// - Automatic retries with exponential backoff for transient failures
+///
+/// # Examples
+///
+/// ```
+/// use sentri::dns::DnsResolver;
+/// use std::net::IpAddr;
+///
+/// # async fn example() -> anyhow::Result<()> {
+/// let resolver = DnsResolver::new()?;
+/// let ips: Vec<IpAddr> = resolver.resolve("example.com").await?;
+/// println!("Resolved IPs: {:?}", ips);
+/// # Ok(())
+/// # }
+/// ```
 pub struct DnsResolver {
     resolver: AsyncResolver,
     retry_config: RetryConfig,
@@ -15,6 +45,28 @@ pub struct DnsResolver {
 }
 
 impl DnsResolver {
+    /// Creates a new DNS resolver with optimal defaults
+    ///
+    /// Initializes a resolver with:
+    /// - System DNS configuration
+    /// - 1024-entry cache with optimized TTLs
+    /// - 5-second timeout with 2 retry attempts
+    /// - Standard exponential backoff retry strategy
+    /// - Automatic rate limiting to prevent DNS server overload
+    ///
+    /// # Returns
+    /// * `Result<Self>` - A configured resolver or error if initialization failed
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sentri::dns::DnsResolver;
+    ///
+    /// # fn example() -> anyhow::Result<()> {
+    /// let resolver = DnsResolver::new()?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn new() -> Result<Self> {
         // Use system configuration with performance optimizations
         let mut opts = ResolverOpts::default();
@@ -74,6 +126,32 @@ impl DnsResolver {
         self
     }
     
+    /// Resolves a domain name to IP addresses with rate limiting and retries
+    ///
+    /// This method performs DNS resolution with built-in protections:
+    /// - Applies rate limiting before making requests
+    /// - Automatically retries transient DNS failures
+    /// - Classifies errors to determine retryable vs. permanent failures
+    /// - Uses optimized caching to reduce redundant lookups
+    ///
+    /// # Arguments
+    /// * `domain` - The domain name to resolve
+    ///
+    /// # Returns
+    /// * `Result<Vec<IpAddr>>` - List of resolved IP addresses or error
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sentri::dns::DnsResolver;
+    ///
+    /// # async fn example() -> anyhow::Result<()> {
+    /// let resolver = DnsResolver::new()?;
+    /// let ips = resolver.resolve("example.com").await?;
+    /// println!("Resolved {} IP addresses", ips.len());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn resolve(&self, domain: &str) -> Result<Vec<IpAddr>> {
         debug!("Resolving DNS for domain: {}", domain);
         

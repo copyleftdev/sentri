@@ -1,3 +1,14 @@
+//! HTTP client optimized for Microsoft Autodiscover services
+//!
+//! This module provides an HTTP client implementation that is specifically
+//! tuned for interacting with Microsoft services with:
+//! - HTTP/2 enabled for better performance
+//! - Connection pooling with optimized settings
+//! - TCP keepalive for connection reuse
+//! - Built-in rate limiting to respect Microsoft API constraints
+//! - Automatic retries with exponential backoff
+//! - Error classification for better failure handling
+
 use anyhow::{Context, Result};
 use reqwest::{Client, ClientBuilder, StatusCode};
 use std::sync::Arc;
@@ -8,6 +19,30 @@ use tracing::{debug, info, warn};
 use crate::retry::{RetryConfig, with_exponential_backoff};
 use crate::rate_limit::{RateLimiter, create_microsoft_api_limiter};
 
+/// High-performance HTTP client for Microsoft API interactions
+///
+/// Provides an optimized HTTP client with:
+/// - HTTP/2 enabled for better connection efficiency
+/// - Connection pooling to reduce connection overhead
+/// - Integrated rate limiting to respect Microsoft API limits
+/// - Automatic retries with exponential backoff for resilience
+/// - Custom timeout and user-agent management
+///
+/// # Examples
+///
+/// ```
+/// use sentri::http::HttpClient;
+/// use std::time::Duration;
+///
+/// # async fn example() -> anyhow::Result<()> {
+/// // Create a client with a 10-second timeout
+/// let client = HttpClient::new(Duration::from_secs(10))?;
+/// 
+/// // Send a SOAP request
+/// let response = client.post_soap_request("<soap:Envelope>...</soap:Envelope>").await?;
+/// # Ok(())
+/// # }
+/// ```
 pub struct HttpClient {
     client: Client,
     autodiscover_url: String,
@@ -16,6 +51,34 @@ pub struct HttpClient {
 }
 
 impl HttpClient {
+    /// Creates a new HTTP client with optimized connection settings
+    ///
+    /// Initializes a client with:
+    /// - HTTP/2 enabled by default
+    /// - 50 max idle connections per host
+    /// - 30 second connection idle timeout
+    /// - 60 second TCP keepalive
+    /// - Standard retry configuration
+    /// - Microsoft-recommended rate limits
+    ///
+    /// # Arguments
+    /// * `timeout` - Request timeout duration
+    ///
+    /// # Returns
+    /// * `Result<Self>` - A configured client or error if initialization failed
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sentri::http::HttpClient;
+    /// use std::time::Duration;
+    ///
+    /// # fn example() -> anyhow::Result<()> {
+    /// // Create a client with a 10-second timeout
+    /// let client = HttpClient::new(Duration::from_secs(10))?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn new(timeout: Duration) -> Result<Self> {
         let client = ClientBuilder::new()
             .timeout(timeout)
@@ -62,13 +125,7 @@ impl HttpClient {
         status.as_u16() == 429 || status.is_server_error()
     }
     
-    /// Sends a SOAP request to the autodiscover endpoint with exponential backoff retries
-    /// 
-    /// # Arguments
-    /// * `body` - The SOAP XML body to send
-    /// 
-    /// # Returns
-    /// Sets a custom rate limiter for the HTTP client.
+    /// Sets a custom rate limiter for the HTTP client
     /// 
     /// This method allows configuring a custom rate limiter for specialized
     /// rate limiting needs beyond the default settings. This is useful for
@@ -99,6 +156,41 @@ impl HttpClient {
         self
     }
     
+    /// Sends a SOAP request to the autodiscover endpoint with exponential backoff retries
+    /// 
+    /// This method handles the complete request workflow:
+    /// 1. Applies rate limiting before making the request
+    /// 2. Sets appropriate SOAP headers
+    /// 3. Automatically retries on transient failures
+    /// 4. Provides detailed error context for troubleshooting
+    /// 
+    /// # Arguments
+    /// * `body` - The SOAP XML body to send
+    /// 
+    /// # Returns
+    /// * `Result<String>` - The response text or error
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// # use sentri::http::HttpClient;
+    /// # use std::time::Duration;
+    /// # async fn example() -> anyhow::Result<()> {
+    /// let client = HttpClient::new(Duration::from_secs(10))?;
+    /// 
+    /// // Example SOAP envelope (simplified)
+    /// let soap_body = r#"<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    ///   <soap:Body>
+    ///     <GetFederationInformation xmlns="http://schemas.microsoft.com/exchange/2010/Autodiscover">
+    ///       <domain>example.com</domain>
+    ///     </GetFederationInformation>
+    ///   </soap:Body>
+    /// </soap:Envelope>"#;
+    /// 
+    /// let response = client.post_soap_request(soap_body).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn post_soap_request(&self, body: &str) -> Result<String> {
         debug!("Sending SOAP request to autodiscover endpoint");
         

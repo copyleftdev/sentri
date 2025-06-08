@@ -1,4 +1,14 @@
-/// Provides domain name validation functionality
+//! Domain name validation and security checking module
+//!
+//! This module implements RFC-compliant domain name validation with security checks:
+//! - Format validation according to RFC 1035 and related standards
+//! - Suspicious domain detection to identify potentially malicious domains
+//! - Input sanitization to prevent security issues
+//!
+//! The validation includes checking for proper domain syntax, length limitations,
+//! character restrictions, and heuristic patterns that may indicate suspicious domains.
+
+/// Domain validator implementing RFC-compliant checks and security heuristics
 pub struct DomainValidator;
 
 impl DomainValidator {
@@ -102,7 +112,32 @@ impl DomainValidator {
     }
 }
 
-/// Validates a domain name and returns a Result with a validation error message if invalid
+/// Validates a domain name against format rules and security checks
+///
+/// This is the main validation function that should be used by other modules
+/// to ensure domains are properly validated before processing. It combines
+/// both format validation and suspicious domain detection.
+///
+/// # Arguments
+/// * `domain` - The domain name string to validate
+///
+/// # Returns
+/// * `Result<(), String>` - Ok(()) if valid, or Err with descriptive message if invalid
+///
+/// # Examples
+///
+/// ```
+/// use sentri::validation::validate_domain;
+///
+/// // Valid domain
+/// assert!(validate_domain("example.com").is_ok());
+///
+/// // Invalid domain (missing TLD)
+/// assert!(validate_domain("invalid").is_err());
+///
+/// // Invalid domain (consecutive dots)
+/// assert!(validate_domain("invalid..domain").is_err());
+/// ```
 pub fn validate_domain(domain: &str) -> Result<(), String> {
     let validator = DomainValidator::new();
     
