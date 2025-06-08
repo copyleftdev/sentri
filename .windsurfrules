@@ -1,0 +1,243 @@
+# Sentri .windsurfrules - Custom Rules Configuration
+# Created: 2025-06-08
+
+# Project Management Rules
+project_management:
+  todo:
+    - rule: "todo_is_source_of_truth"
+      severity: "error"
+      message: "TODO.md is the only source of truth for project state"
+    - rule: "verify_completion_with_tests"
+      severity: "error"
+      message: "All completed items must be verified by tests"
+    - rule: "update_todo_after_verification"
+      severity: "error"
+      message: "Update TODO.md status only after test verification"
+    - rule: "no_comments_in_code"
+      severity: "error"
+      message: "No comments in code, only docstrings are permitted"
+
+# Performance Critical Rules
+performance:
+  # Connection pooling and HTTP optimization
+  http_client:
+    - rule: "use_http2_by_default"
+      severity: "error"
+      message: "HTTP/2 must be enabled for optimal performance"
+    - rule: "connection_pooling_required"
+      severity: "error" 
+      message: "Connection pooling must be implemented"
+    - rule: "idle_timeout_config"
+      severity: "warning"
+      message: "Connection idle timeout should be configured"
+    - rule: "keepalive_required"
+      severity: "warning"
+      message: "TCP keepalive should be enabled"
+
+  # Memory management
+  memory:
+    - rule: "avoid_unnecessary_allocations"
+      severity: "warning"
+      message: "Avoid redundant clones and unnecessary allocations"
+    - rule: "use_streaming_io"
+      severity: "warning"
+      message: "Use streaming IO for large file operations"
+    - rule: "prefer_stack_allocation"
+      severity: "info"
+      message: "Prefer stack allocation when appropriate"
+    - rule: "careful_ref_counting"
+      severity: "warning"
+      message: "Be careful with reference counting (Arc, Rc)"
+
+  # Concurrency
+  concurrency:
+    - rule: "prefer_tokio_tasks"
+      severity: "warning"
+      message: "Prefer tokio tasks over threads for IO-bound operations"
+    - rule: "avoid_blocking_in_async"
+      severity: "error"
+      message: "Avoid blocking operations in async contexts"
+    - rule: "limit_tokio_worker_threads"
+      severity: "warning"
+      message: "Configure tokio runtime with appropriate thread count"
+    - rule: "use_semaphores_for_concurrency_limits"
+      severity: "error"
+      message: "Use semaphores to limit concurrent operations"
+
+# Security Rules
+security:
+  # Input validation
+  input:
+    - rule: "sanitize_all_input"
+      severity: "error"
+      message: "Validate and sanitize all external inputs"
+    - rule: "validate_domain_names"
+      severity: "error"
+      message: "Validate domain names before processing"
+    - rule: "limit_input_size"
+      severity: "error"
+      message: "Limit input size to prevent DoS"
+
+  # Output handling
+  output:
+    - rule: "sanitize_all_output"
+      severity: "warning"
+      message: "Sanitize all output to prevent information leaks"
+    - rule: "error_info_control"
+      severity: "warning"
+      message: "Control error information in production environments"
+
+  # Network security
+  network:
+    - rule: "validate_ssl_certs"
+      severity: "error"
+      message: "Always validate SSL certificates"
+    - rule: "secure_tls_versions"
+      severity: "error"
+      message: "Use only secure TLS versions (TLS 1.2+)"
+    - rule: "timeout_all_requests"
+      severity: "error"
+      message: "Set timeouts for all network requests"
+    - rule: "limit_redirect_follows"
+      severity: "warning"
+      message: "Limit redirect follows to prevent redirect loops"
+
+# Rust Best Practices
+rust:
+  # Error handling
+  errors:
+    - rule: "use_anyhow_for_errors"
+      severity: "warning"
+      message: "Use anyhow for error propagation"
+    - rule: "proper_error_context"
+      severity: "warning"
+      message: "Add context to errors using .context() or .with_context()"
+    - rule: "avoid_unwrap_except"
+      severity: "error"
+      message: "Avoid unwrap() and expect() in production code"
+    - rule: "propagate_errors"
+      severity: "error"
+      message: "Properly propagate errors using ? operator"
+
+  # Memory safety
+  safety:
+    - rule: "avoid_unsafe"
+      severity: "error"
+      message: "Avoid unsafe code unless absolutely necessary"
+    - rule: "document_all_unsafe"
+      severity: "error"
+      message: "Document all unsafe code with safety invariants"
+    - rule: "minimize_unsafe_blocks"
+      severity: "warning"
+      message: "Keep unsafe blocks as small as possible"
+    - rule: "unsafe_requires_tests"
+      severity: "error"
+      message: "All unsafe code must have tests"
+
+  # Code style
+  style:
+    - rule: "follow_rust_naming_conventions"
+      severity: "warning"
+      message: "Follow Rust naming conventions"
+    - rule: "avoid_too_many_arguments"
+      severity: "warning"
+      message: "Avoid functions with too many arguments (>5)"
+    - rule: "prefer_builder_pattern"
+      severity: "info"
+      message: "Consider builder pattern for complex struct creation"
+    - rule: "avoid_large_enums"
+      severity: "warning" 
+      message: "Avoid large enums to prevent stack overflows"
+
+# MDI-Specific Rules
+mdi:
+  # Domain handling
+  domains:
+    - rule: "rate_limit_domains"
+      severity: "error"
+      message: "Implement rate limiting for domain checks"
+    - rule: "respect_api_limits"
+      severity: "error"
+      message: "Respect Microsoft's API rate limits"
+    - rule: "cache_domain_results"
+      severity: "warning"
+      message: "Cache domain check results"
+    - rule: "retry_with_backoff"
+      severity: "warning"
+      message: "Implement exponential backoff for retries"
+
+  # API communication
+  api:
+    - rule: "robust_xml_parsing"
+      severity: "error"
+      message: "Implement robust error handling for XML parsing"
+    - rule: "validate_autodiscover_responses"
+      severity: "error"
+      message: "Validate autodiscover XML responses"
+    - rule: "handle_soap_errors"
+      severity: "error"
+      message: "Handle SOAP error responses correctly"
+
+# Testing Rules
+testing:
+  # Unit tests
+  unit:
+    - rule: "test_all_public_functions"
+      severity: "error"
+      message: "All public functions must have tests"
+    - rule: "mock_external_services"
+      severity: "warning"
+      message: "Mock external services in tests"
+    - rule: "parameterize_tests"
+      severity: "info"
+      message: "Parameterize tests for coverage"
+
+  # Integration tests
+  integration:
+    - rule: "test_error_cases"
+      severity: "warning"
+      message: "Test error cases and edge conditions"
+    - rule: "test_rate_limiting"
+      severity: "warning"
+      message: "Test rate limiting functionality"
+    - rule: "test_large_inputs"
+      severity: "warning"
+      message: "Test with large inputs"
+
+# Documentation Rules
+documentation:
+  # Code documentation
+  code:
+    - rule: "document_public_api"
+      severity: "error"
+      message: "Document all public API functions"
+    - rule: "document_complex_algorithms"
+      severity: "warning"
+      message: "Document complex algorithms"
+    - rule: "explain_optimizations"
+      severity: "info"
+      message: "Explain performance optimizations"
+
+  # User documentation
+  user:
+    - rule: "update_readme"
+      severity: "warning"
+      message: "Keep README up to date with features"
+    - rule: "provide_examples"
+      severity: "warning"
+      message: "Provide usage examples for all features"
+
+# CI/CD Rules
+cicd:
+  - rule: "run_clippy"
+    severity: "error"
+    message: "Run clippy as part of CI"
+  - rule: "enforce_test_coverage"
+    severity: "warning" 
+    message: "Enforce minimum test coverage"
+  - rule: "run_security_audit"
+    severity: "error"
+    message: "Run cargo audit for security vulnerabilities"
+  - rule: "benchmark_performance"
+    severity: "warning"
+    message: "Run performance benchmarks for critical paths"

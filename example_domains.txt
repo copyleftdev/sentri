@@ -1,0 +1,34 @@
+# Example domains file for Sentri
+# One domain per line, comments starting with # are ignored
+
+microsoft.com
+google.com
+amazon.com
+apple.com
+netflix.com
+salesforce.com
+adobe.com
+oracle.com
+ibm.com
+dell.com
+
+# Large tech companies
+facebook.com
+twitter.com
+linkedin.com
+github.com
+stackoverflow.com
+
+# Financial institutions  
+jpmorgan.com
+goldmansachs.com
+morganstanley.com
+wellsfargo.com
+bankofamerica.com
+
+# Fortune 500 companies
+walmart.com
+exxonmobil.com
+berkshirehathaway.com
+unitedhealth.com
+mckesson.com
