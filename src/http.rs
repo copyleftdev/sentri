@@ -35,8 +35,8 @@ use std::time::Duration;
 
 use tracing::{debug, info, warn};
 
-use crate::retry::{RetryConfig, with_exponential_backoff};
-use crate::rate_limit::{RateLimiter, create_microsoft_api_limiter};
+use crate::rate_limit::{create_microsoft_api_limiter, RateLimiter};
+use crate::retry::{with_exponential_backoff, RetryConfig};
 
 /// High-performance HTTP client for Microsoft API interactions
 ///
@@ -71,7 +71,7 @@ use crate::rate_limit::{RateLimiter, create_microsoft_api_limiter};
 /// # async fn example() -> anyhow::Result<()> {
 /// // Create a client with a 10-second timeout
 /// let client = HttpClient::new(Duration::from_secs(10))?;
-/// 
+///
 /// // Send a SOAP request
 /// let response = client.post_soap_request("<soap:Envelope>...</soap:Envelope>").await?;
 /// # Ok(())
@@ -90,7 +90,7 @@ use crate::rate_limit::{RateLimiter, create_microsoft_api_limiter};
 ///     .timeout(Duration::from_secs(10))
 ///     .max_redirects(3)  // Stricter redirect policy
 ///     .build()?;
-///     
+///
 /// # Ok(())
 /// # }
 /// ```
@@ -108,7 +108,7 @@ pub struct HttpClient {
 /// It follows the builder pattern for a fluent API.
 ///
 /// # Security Considerations
-/// 
+///
 /// - Certificate validation is enabled by default and should remain enabled in production
 ///   environments (security:network:validate_ssl_certs).
 /// - Redirect limits default to 5 to prevent redirect loops and potential security issues
@@ -119,11 +119,11 @@ pub struct HttpClient {
 ///   (security:network:timeout_all_requests).
 ///
 /// # Examples
-/// 
+///
 /// ```
 /// use sentri::http::HttpClient;
 /// use std::time::Duration;
-/// 
+///
 /// # fn example() -> anyhow::Result<()> {
 /// // Create a client with custom settings
 /// let client = HttpClient::builder()
@@ -317,12 +317,14 @@ impl HttpClientBuilder {
             .pool_idle_timeout(self.pool_idle_timeout)
             .tcp_keepalive(self.tcp_keepalive)
             .danger_accept_invalid_certs(!self.verify_certificates)
-            .https_only(true)  // Force HTTPS for security
+            .https_only(true) // Force HTTPS for security
             .http2_prior_knowledge();
 
         // Configure redirect policy
         if self.max_redirects > 0 {
-            builder = builder.redirect(reqwest::redirect::Policy::limited(self.max_redirects as usize));
+            builder = builder.redirect(reqwest::redirect::Policy::limited(
+                self.max_redirects as usize,
+            ));
         } else {
             builder = builder.redirect(reqwest::redirect::Policy::none());
         }
@@ -343,10 +345,11 @@ impl HttpClientBuilder {
 
         // Create a rate limiter following Microsoft's recommended limits
         let rate_limiter = Arc::new(create_microsoft_api_limiter());
-        
+
         Ok(HttpClient {
             client,
-            autodiscover_url: "https://autodiscover-s.outlook.com/autodiscover/autodiscover.svc".to_string(),
+            autodiscover_url: "https://autodiscover-s.outlook.com/autodiscover/autodiscover.svc"
+                .to_string(),
             retry_config: RetryConfig::default(),
             rate_limiter,
         })
@@ -388,7 +391,7 @@ impl HttpClient {
     pub fn new(timeout: Duration) -> Result<Self> {
         Self::builder().timeout(timeout).build()
     }
-    
+
     /// Returns a new builder for creating an HttpClient with custom configuration
     ///
     /// # Returns
@@ -411,19 +414,19 @@ impl HttpClient {
     pub fn builder() -> HttpClientBuilder {
         HttpClientBuilder::default()
     }
-    
+
     /// Sets a custom rate limiter for the HTTP client
-    /// 
+    ///
     /// This method allows configuring a custom rate limiter for specialized
     /// rate limiting needs beyond the default settings. This is useful for
     /// testing scenarios or when specific rate limiting policies need to be respected.
-    /// 
+    ///
     /// # Arguments
     /// * `limiter` - The custom rate limiter to use
-    /// 
+    ///
     /// # Returns
     /// * `Self` - The HTTP client with custom rate limiter configured
-    /// 
+    ///
     /// # Examples
     /// ```
     /// # use sentri::http::HttpClient;
@@ -443,7 +446,7 @@ impl HttpClient {
     }
 
     /// Sets a custom retry configuration for the HTTP client
-    /// 
+    ///
     /// # Arguments
     /// * `config` - The retry configuration to use
     #[allow(dead_code)]
@@ -451,13 +454,13 @@ impl HttpClient {
         self.retry_config = config;
         self
     }
-    
+
     /// Determines if a response error is retriable
-    /// 
+    ///
     /// # Arguments
     /// * `status` - The HTTP status code to check
     /// * `retry_count` - The current retry count
-    /// 
+    ///
     /// # Returns
     /// True if the error is retriable, false otherwise
     fn is_retriable_status(&self, status: StatusCode) -> bool {
@@ -465,29 +468,29 @@ impl HttpClient {
         // 5xx are server errors that may be transient
         status.as_u16() == 429 || status.is_server_error()
     }
-    
+
     /// Sends a SOAP request to the autodiscover endpoint with exponential backoff retries
-    /// 
+    ///
     /// This method handles the complete request workflow:
     /// 1. Applies rate limiting before making the request
     /// 2. Sets appropriate SOAP headers
     /// 3. Automatically retries on transient failures
     /// 4. Provides detailed error context for troubleshooting
-    /// 
+    ///
     /// # Arguments
     /// * `body` - The SOAP XML body to send
-    /// 
+    ///
     /// # Returns
     /// * `Result<String>` - The response text or error
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// # use sentri::http::HttpClient;
     /// # use std::time::Duration;
     /// # async fn example() -> anyhow::Result<()> {
     /// let client = HttpClient::new(Duration::from_secs(10))?;
-    /// 
+    ///
     /// // Example SOAP envelope (simplified)
     /// let soap_body = r#"<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     ///   <soap:Body>
@@ -496,19 +499,19 @@ impl HttpClient {
     ///     </GetFederationInformation>
     ///   </soap:Body>
     /// </soap:Envelope>"#;
-    /// 
+    ///
     /// let response = client.post_soap_request(soap_body).await?;
     /// # Ok(())
     /// # }
     /// ```
     pub async fn post_soap_request(&self, body: &str) -> Result<String> {
         debug!("Sending SOAP request to autodiscover endpoint");
-        
+
         // Acquire rate limit permit before proceeding
         debug!("Acquiring rate limit permit");
         let _permit = self.rate_limiter.acquire().await?;
         debug!("Rate limit permit acquired, proceeding with request");
-        
+
         let body_owned = body.to_string();
         let client = self.client.clone();
         let url = self.autodiscover_url.clone();
@@ -525,12 +528,12 @@ impl HttpClient {
                     .send()
                     .await
                     .context("Failed to send SOAP request")?;
-                
+
                 // Check if the response status indicates success
                 if !resp.status().is_success() {
                     let status = resp.status();
                     let err = anyhow::anyhow!("HTTP request failed with status: {}", status);
-                    
+
                     // Log different messages based on status code
                     if status.as_u16() == 429 {
                         warn!("Rate limit exceeded, will retry: {}", status);
@@ -540,10 +543,10 @@ impl HttpClient {
                         // Client errors (4xx) other than 429 are not generally retriable
                         info!("Non-retriable client error: {}", status);
                     }
-                    
+
                     return Err(err);
                 }
-                
+
                 Ok(resp)
             },
             |err| {
@@ -551,11 +554,11 @@ impl HttpClient {
                 if let Some(status) = err.chain()
                     .filter_map(|e| e.downcast_ref::<reqwest::Error>())
                     .filter_map(|e| e.status())
-                    .next() 
+                    .next()
                 {
                     return self.is_retriable_status(status);
                 }
-                
+
                 // Network errors, timeouts, etc. are all retriable
                 matches!(err.downcast_ref::<reqwest::Error>(), Some(e) if e.is_timeout() || e.is_connect())
             },
