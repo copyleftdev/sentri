@@ -202,7 +202,7 @@ async fn test_error_handling_empty_file() -> Result<()> {
     
     if retries == 0 {
         return Err(anyhow::anyhow!("Failed to read output file after multiple attempts: {}", 
-            last_error.unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Unknown error"))));
+            last_error.unwrap_or_else(|| std::io::Error::other("Unknown error"))));
     }
 
     println!("File content: '{}'", content);
