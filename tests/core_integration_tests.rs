@@ -152,18 +152,22 @@ async fn test_error_handling_empty_file() -> Result<()> {
 
     // Wait a moment to ensure temp directory is ready
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    
-    println!("Processing batch with input: {}, output: {}", input_file.display(), output_file.display());
-    
+
+    println!(
+        "Processing batch with input: {}, output: {}",
+        input_file.display(),
+        output_file.display()
+    );
+
     // Process the batch with more robust error handling
     let result = checker
         .process_batch(&input_file, Some(&output_file), 10, 30)
         .await;
-    
+
     if let Err(e) = &result {
         println!("Error in process_batch: {}", e);
     }
-    
+
     // More verbose error reporting
     result.map_err(|e| anyhow::anyhow!("Failed to process batch: {}", e))?;
 
@@ -172,7 +176,11 @@ async fn test_error_handling_empty_file() -> Result<()> {
 
     // Verify output file exists with more detailed error
     let exists = std::path::Path::new(&output_file).exists();
-    println!("Output file exists: {}, path: {}", exists, output_file.display());
+    println!(
+        "Output file exists: {}, path: {}",
+        exists,
+        output_file.display()
+    );
     assert!(
         exists,
         "Output file does not exist: {}",
@@ -183,7 +191,7 @@ async fn test_error_handling_empty_file() -> Result<()> {
     let mut retries = 3;
     let mut content = String::new();
     let mut last_error = None;
-    
+
     while retries > 0 {
         match fs::read_to_string(&output_file) {
             Ok(file_content) => {
@@ -191,7 +199,7 @@ async fn test_error_handling_empty_file() -> Result<()> {
                 break;
             }
             Err(e) => {
-                println!("Error reading file (retry {}): {}", 4-retries, e);
+                println!("Error reading file (retry {}): {}", 4 - retries, e);
                 last_error = Some(e);
                 retries -= 1;
                 // Wait before retrying on Windows in case of file locking
@@ -199,14 +207,16 @@ async fn test_error_handling_empty_file() -> Result<()> {
             }
         }
     }
-    
+
     if retries == 0 {
-        return Err(anyhow::anyhow!("Failed to read output file after multiple attempts: {}", 
-            last_error.unwrap_or_else(|| std::io::Error::other("Unknown error"))));
+        return Err(anyhow::anyhow!(
+            "Failed to read output file after multiple attempts: {}",
+            last_error.unwrap_or_else(|| std::io::Error::other("Unknown error"))
+        ));
     }
 
     println!("File content: '{}'", content);
-    
+
     // Check content is valid (empty or empty JSON array)
     assert!(
         content.is_empty() || content.trim() == "[]",
