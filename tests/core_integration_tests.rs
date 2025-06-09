@@ -125,52 +125,92 @@ async fn test_error_handling_empty_file() -> Result<()> {
     // Create an empty file
     let input_file = create_test_domain_file(&[]).await?;
 
+    // Make sure the file actually exists before proceeding
+    assert!(
+        input_file.exists(),
+        "Input file was not created: {}",
+        input_file.display()
+    );
+
     // Ensure file cleanup with a guard pattern
     struct CleanupGuard(PathBuf);
     impl Drop for CleanupGuard {
         fn drop(&mut self) {
-            let _ = fs::remove_file(&self.0); // Ignore errors on cleanup
+            // First check if file exists to avoid errors on cleanup
+            if self.0.exists() {
+                let _ = fs::remove_file(&self.0);
+            }
         }
     }
     let _input_guard = CleanupGuard(input_file.clone());
 
     // Create an output file path with a unique timestamp
     let temp_dir = std::env::temp_dir();
-    let output_file = temp_dir.join(format!(
-        "empty_results_{}.json",
-        Instant::now().elapsed().as_nanos()
-    ));
+    let timestamp = Instant::now().elapsed().as_nanos().to_string();
+    let output_file = temp_dir.join(format!("empty_results_{}.json", timestamp));
     let _output_guard = CleanupGuard(output_file.clone());
 
-    // Process the batch with more robust error handling
-    checker
-        .process_batch(&input_file, Some(&output_file), 10, 30)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to process batch: {}", e))?;
-
-    // Wait a moment to ensure file operations complete on all platforms
+    // Wait a moment to ensure temp directory is ready
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    
+    println!("Processing batch with input: {}, output: {}", input_file.display(), output_file.display());
+    
+    // Process the batch with more robust error handling
+    let result = checker
+        .process_batch(&input_file, Some(&output_file), 10, 30)
+        .await;
+    
+    if let Err(e) = &result {
+        println!("Error in process_batch: {}", e);
+    }
+    
+    // More verbose error reporting
+    result.map_err(|e| anyhow::anyhow!("Failed to process batch: {}", e))?;
 
-    // Verify output file exists and check content
+    // Wait longer to ensure file operations complete on all platforms (especially Windows)
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    // Verify output file exists with more detailed error
+    let exists = std::path::Path::new(&output_file).exists();
+    println!("Output file exists: {}, path: {}", exists, output_file.display());
     assert!(
-        std::path::Path::new(&output_file).exists(),
+        exists,
         "Output file does not exist: {}",
         output_file.display()
     );
 
-    // Read content with better error handling
-    let content = fs::read_to_string(&output_file).map_err(|e| {
-        anyhow::anyhow!(
-            "Failed to read output file {}: {}",
-            output_file.display(),
-            e
-        )
-    })?;
+    // Read content with better error handling and retry logic for Windows
+    let mut retries = 3;
+    let mut content = String::new();
+    let mut last_error = None;
+    
+    while retries > 0 {
+        match fs::read_to_string(&output_file) {
+            Ok(file_content) => {
+                content = file_content;
+                break;
+            }
+            Err(e) => {
+                println!("Error reading file (retry {}): {}", 4-retries, e);
+                last_error = Some(e);
+                retries -= 1;
+                // Wait before retrying on Windows in case of file locking
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            }
+        }
+    }
+    
+    if retries == 0 {
+        return Err(anyhow::anyhow!("Failed to read output file after multiple attempts: {}", 
+            last_error.unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Unknown error"))));
+    }
 
+    println!("File content: '{}'", content);
+    
     // Check content is valid (empty or empty JSON array)
     assert!(
         content.is_empty() || content.trim() == "[]",
-        "Unexpected content in output file: {}",
+        "Unexpected content in output file: '{}'",
         content
     );
 
