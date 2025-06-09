@@ -1,14 +1,38 @@
 //! Domain name validation and security checking module
 //!
-//! This module implements RFC-compliant domain name validation with security checks:
+//! This module implements RFC-compliant domain name validation with comprehensive security checks:
 //! - Format validation according to RFC 1035 and related standards
 //! - Suspicious domain detection to identify potentially malicious domains
-//! - Input sanitization to prevent security issues
+//! - Input sanitization to prevent security issues including injection attacks
+//! - Strict adherence to domain name specifications to prevent security bypasses
 //!
-//! The validation includes checking for proper domain syntax, length limitations,
-//! character restrictions, and heuristic patterns that may indicate suspicious domains.
+//! # Security Considerations
+//!
+//! Input validation is the first line of defense in the application. This module ensures that:
+//! - All domain inputs are properly sanitized before further processing
+//! - Potentially malicious or suspicious domains are flagged early
+//! - Strict RFC compliance prevents edge cases that could lead to security issues
+//! - Character set limitations prevent Unicode-based homograph attacks
+//!
+//! # Performance Considerations
+//!
+//! The validation is designed to be efficient:
+//! - Uses fast string operations and avoids regex where possible for better performance
+//! - Implements early-return patterns to avoid unnecessary computation
+//! - Minimizes memory allocations by using iterators and in-place checks
+//! - Validation logic order is optimized for common failure cases first
+//!
+//! # Usage Guidelines
+//!
+//! The public `validate_domain` function should be used as the primary entry point for
+//! all domain validation requirements in the application. It properly encapsulates both
+//! format validation and security heuristics to provide a complete validation solution.
 
 /// Domain validator implementing RFC-compliant checks and security heuristics
+///
+/// This struct provides methods for validating domain names against format
+/// specifications and security heuristics. It follows a stateless design pattern
+/// with methods that perform specific validation checks.
 pub struct DomainValidator;
 
 impl DomainValidator {
@@ -17,16 +41,39 @@ impl DomainValidator {
         Self {}
     }
 
-    /// Validates a domain name for format and syntax
+    /// Validates a domain name for format and syntax according to RFC standards
+    /// 
+    /// This function performs comprehensive RFC-compliant domain validation to ensure
+    /// the domain meets all formatting requirements and doesn't contain malformed
+    /// components that could lead to security issues.
+    ///
+    /// # Format Requirements
     /// 
     /// This function checks that the domain:
-    /// - Contains at least one dot (.)
+    /// - Contains at least one dot (.) - RFC 1035 requirement for FQDN
     /// - Has a valid TLD (at least 2 characters)
-    /// - Does not exceed 253 characters (RFC 1035)
-    /// - Consists of valid characters (a-z, 0-9, -, .)
-    /// - Does not have consecutive dots
+    /// - Does not exceed 253 characters total length (RFC 1035)
+    /// - Consists of valid characters (a-z, 0-9, -, .) only
+    /// - Does not have consecutive dots which would indicate empty labels
     /// - Does not start or end with a dot or hyphen
-    /// - Each label (part between dots) does not exceed 63 characters
+    /// - Each label (part between dots) does not exceed 63 characters (RFC 1035)
+    ///
+    /// # Security Considerations
+    /// 
+    /// Domain format validation is critical for security because improper validation
+    /// could allow injection attacks or lead to unexpected behavior in DNS resolution.
+    /// This implementation enforces strict standards compliance to prevent such issues.
+    ///
+    /// # Performance Notes
+    /// 
+    /// The validation is implemented with early returns for efficiency, checking the
+    /// most common failure cases first to avoid unnecessary processing. String splitting
+    /// is minimized to reduce allocations.
+    ///
+    /// # Returns
+    /// 
+    /// * `true` - If the domain meets all format requirements
+    /// * `false` - If the domain fails any validation check
     pub fn validate_domain_format(&self, domain: &str) -> bool {
         // Check length constraints
         if domain.is_empty() || domain.len() > 253 {
@@ -73,12 +120,35 @@ impl DomainValidator {
         true
     }
     
-    /// Checks if a domain appears to be potentially malicious
+    /// Checks if a domain appears to be potentially malicious using heuristic analysis
+    /// 
+    /// This function applies security heuristics to detect potentially suspicious or
+    /// malicious domains. These patterns are commonly associated with generated domains
+    /// used in phishing, malware distribution, or command-and-control operations.
+    ///
+    /// # Detection Heuristics
     /// 
     /// Looks for common indicators of suspicious domains:
-    /// - Excessive number of hyphens
-    /// - Very long TLDs
-    /// - Unusual character patterns
+    /// - Excessive number of hyphens (often used in automatically generated domains)
+    /// - Very long TLDs (unusual and often associated with malicious registrations)
+    /// - Unusual repeating character patterns (common in algorithm-generated domains)
+    /// 
+    /// # Security Considerations
+    /// 
+    /// This detection serves as an early warning system but is not meant to replace
+    /// comprehensive security analysis. False positives are possible but are preferred
+    /// over false negatives in security-critical applications.
+    /// 
+    /// # Performance Notes
+    /// 
+    /// The heuristics are applied in order of computational complexity, with simpler
+    /// checks performed first for better performance. The function returns early on
+    /// the first suspicious pattern match.
+    ///
+    /// # Returns
+    /// 
+    /// * `true` - If suspicious patterns are detected
+    /// * `false` - If no suspicious patterns are found
     pub fn is_suspicious(&self, domain: &str) -> bool {
         // Count hyphens (excessive hyphens can be suspicious)
         let hyphen_count = domain.chars().filter(|&c| c == '-').count();
@@ -116,7 +186,21 @@ impl DomainValidator {
 ///
 /// This is the main validation function that should be used by other modules
 /// to ensure domains are properly validated before processing. It combines
-/// both format validation and suspicious domain detection.
+/// both format validation and suspicious domain detection in a single call.
+///
+/// # Security Considerations
+///
+/// This function implements the principle that all external inputs must be validated
+/// and sanitized (security:input:sanitize_all_input). It serves as the primary
+/// defense against injection attacks, malformed inputs, and potentially malicious
+/// domains.
+///
+/// # Performance Considerations
+///
+/// The function creates a single validator instance and performs validations in
+/// sequence, starting with the less expensive format validation before moving to
+/// heuristic analysis. This approach optimizes performance while maintaining
+/// security integrity.
 ///
 /// # Arguments
 /// * `domain` - The domain name string to validate
@@ -137,6 +221,12 @@ impl DomainValidator {
 ///
 /// // Invalid domain (consecutive dots)
 /// assert!(validate_domain("invalid..domain").is_err());
+///
+/// // Domain with invalid characters
+/// assert!(validate_domain("example!.com").is_err());
+///
+/// // Suspicious domain with excessive hyphens
+/// assert!(validate_domain("a-b-c-d-e-f.com").is_err());
 /// ```
 pub fn validate_domain(domain: &str) -> Result<(), String> {
     let validator = DomainValidator::new();
@@ -149,5 +239,6 @@ pub fn validate_domain(domain: &str) -> Result<(), String> {
         return Err(format!("Suspicious domain detected: {}", domain));
     }
     
+    // Domain passed all validation checks
     Ok(())
 }

@@ -5,6 +5,9 @@ use std::time::Instant;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use std::fs;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::Semaphore;
 
 // Helper function to create a temporary test file with domains
 async fn create_test_domain_file(domains: &[&str]) -> Result<PathBuf> {
