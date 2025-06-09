@@ -39,6 +39,13 @@ pub struct XmlParser {
     test_mode: bool,
 }
 
+impl Default for XmlParser {
+    /// Creates a default instance of XML parser
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl XmlParser {
     /// Creates a new XmlParser with initialized validation rules
     pub fn new() -> Self {
@@ -204,9 +211,9 @@ impl XmlParser {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Start(ref e)) => {
                     // Convert tag name to string, handling errors
-                    let name_ref = e.name().clone();
+                    let name_ref = e.name();
                     let name = std::str::from_utf8(name_ref.as_ref())
-                        .with_context(|| format!("Invalid UTF-8 in tag name"))?
+                        .with_context(|| "Invalid UTF-8 in tag name".to_string())?
                         .to_string();
                     
                     // Track element path for context

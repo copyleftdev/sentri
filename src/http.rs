@@ -557,10 +557,7 @@ impl HttpClient {
                 }
                 
                 // Network errors, timeouts, etc. are all retriable
-                match err.downcast_ref::<reqwest::Error>() {
-                    Some(e) if e.is_timeout() || e.is_connect() => true,
-                    _ => false,
-                }
+                matches!(err.downcast_ref::<reqwest::Error>(), Some(e) if e.is_timeout() || e.is_connect())
             },
             retry_config,
         )

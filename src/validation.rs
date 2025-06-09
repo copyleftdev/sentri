@@ -35,6 +35,13 @@
 /// with methods that perform specific validation checks.
 pub struct DomainValidator;
 
+impl Default for DomainValidator {
+    /// Creates a default DomainValidator instance
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DomainValidator {
     /// Creates a new DomainValidator instance
     pub fn new() -> Self {

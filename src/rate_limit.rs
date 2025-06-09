@@ -108,6 +108,7 @@ impl RateLimiter {
     /// * `requests_per_period` - New maximum number of requests allowed in the time period
     /// * `period_ms` - New time period in milliseconds
     /// * `max_concurrent` - New maximum number of concurrent requests
+    ///
     /// Updates the rate limiter configuration with new parameters.
     /// 
     /// This method allows dynamically changing the rate limiter configuration
