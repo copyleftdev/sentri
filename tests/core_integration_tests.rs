@@ -16,25 +16,35 @@ async fn create_test_domain_file(domains: &[&str]) -> Result<PathBuf> {
     ));
 
     // Use more robust error handling with better context
-    let mut file = File::create(&test_file)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to create test file {}: {}", test_file.display(), e))?;
+    let mut file = File::create(&test_file).await.map_err(|e| {
+        anyhow::anyhow!("Failed to create test file {}: {}", test_file.display(), e)
+    })?;
 
     for domain in domains {
         file.write_all(format!("{}\n", domain).as_bytes())
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to write to test file {}: {}", test_file.display(), e))?;
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to write to test file {}: {}",
+                    test_file.display(),
+                    e
+                )
+            })?;
     }
-    
-    file.flush().await
+
+    file.flush()
+        .await
         .map_err(|e| anyhow::anyhow!("Failed to flush test file {}: {}", test_file.display(), e))?;
-    
+
     // Ensure file is closed properly
     drop(file);
-    
+
     // Verify the file exists before returning
     if !test_file.exists() {
-        return Err(anyhow::anyhow!("Test file was not created properly: {}", test_file.display()));
+        return Err(anyhow::anyhow!(
+            "Test file was not created properly: {}",
+            test_file.display()
+        ));
     }
 
     Ok(test_file)
@@ -114,7 +124,7 @@ async fn test_error_handling_empty_file() -> Result<()> {
 
     // Create an empty file
     let input_file = create_test_domain_file(&[]).await?;
-    
+
     // Ensure file cleanup with a guard pattern
     struct CleanupGuard(PathBuf);
     impl Drop for CleanupGuard {
@@ -142,16 +152,27 @@ async fn test_error_handling_empty_file() -> Result<()> {
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     // Verify output file exists and check content
-    assert!(std::path::Path::new(&output_file).exists(), 
-            "Output file does not exist: {}", output_file.display());
-            
+    assert!(
+        std::path::Path::new(&output_file).exists(),
+        "Output file does not exist: {}",
+        output_file.display()
+    );
+
     // Read content with better error handling
-    let content = fs::read_to_string(&output_file)
-        .map_err(|e| anyhow::anyhow!("Failed to read output file {}: {}", output_file.display(), e))?;
-    
+    let content = fs::read_to_string(&output_file).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to read output file {}: {}",
+            output_file.display(),
+            e
+        )
+    })?;
+
     // Check content is valid (empty or empty JSON array)
-    assert!(content.is_empty() || content.trim() == "[]", 
-            "Unexpected content in output file: {}", content);
+    assert!(
+        content.is_empty() || content.trim() == "[]",
+        "Unexpected content in output file: {}",
+        content
+    );
 
     // File cleanup happens automatically via drop guards
     Ok(())
@@ -171,7 +192,7 @@ async fn test_concurrency_limits_respected() -> Result<()> {
 
     // Convert domains to string slices for the helper function
     let domains_refs: Vec<&str> = domains.iter().map(AsRef::as_ref).collect();
-    
+
     // Create cleanup guard for automatic file cleanup
     struct CleanupGuard(PathBuf);
     impl Drop for CleanupGuard {
@@ -187,7 +208,8 @@ async fn test_concurrency_limits_respected() -> Result<()> {
     // Verify the file exists more robustly using std::path::Path
     assert!(
         std::path::Path::new(&input_file).exists(),
-        "Test file was not created properly: {}", input_file.display()
+        "Test file was not created properly: {}",
+        input_file.display()
     );
 
     // Create an output file path with a unique timestamp to avoid collisions
@@ -213,17 +235,28 @@ async fn test_concurrency_limits_respected() -> Result<()> {
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     // Verify the output file exists with better error message
-    assert!(std::path::Path::new(&output_file).exists(),
-            "Output file does not exist: {}", output_file.display());
+    assert!(
+        std::path::Path::new(&output_file).exists(),
+        "Output file does not exist: {}",
+        output_file.display()
+    );
 
     // Read the content to ensure all domains were processed with better error handling
-    let content = fs::read_to_string(&output_file)
-        .map_err(|e| anyhow::anyhow!("Failed to read output file {}: {}", output_file.display(), e))?;
+    let content = fs::read_to_string(&output_file).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to read output file {}: {}",
+            output_file.display(),
+            e
+        )
+    })?;
 
     // Verify content has our domains
     for domain in domains_refs.iter() {
-        assert!(content.contains(domain), 
-                "Domain '{}' not found in output content", domain);
+        assert!(
+            content.contains(domain),
+            "Domain '{}' not found in output content",
+            domain
+        );
     }
 
     // Files will be cleaned up automatically via drop guards
