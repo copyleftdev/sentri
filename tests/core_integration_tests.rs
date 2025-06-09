@@ -196,8 +196,9 @@ async fn test_process_batch_with_nonexistent_file() -> Result<()> {
     
     // Should fail with an error
     assert!(result.is_err());
-    let err = result.unwrap_err().to_string();
-    assert!(err.contains("Failed to open") || err.contains("No such file"));
+    let err = result.unwrap_err();
+    let err_str = format!("{}", err);
+    assert!(err_str.contains("Failed to open") || err_str.contains("No such file"));
     
     Ok(())
 }

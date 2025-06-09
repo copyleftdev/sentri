@@ -168,7 +168,7 @@ async fn test_http_client_with_custom_request() -> Result<()> {
     // since the error message might vary depending on environment
     let err = result.unwrap_err();
     // Print the error for debugging but don't assert on specific content
-    println!("Error received: {}", err.to_string());
+    println!("Error received: {}", err);
     
     Ok(())
 }
