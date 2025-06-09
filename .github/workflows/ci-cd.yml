@@ -45,10 +45,7 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
       
       - name: Clippy check
-        uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features --all-targets -- -D warnings
+        run: cargo clippy --all-features --all-targets -- -D warnings
           
       - name: Check formatting
         run: cargo fmt -- --check
