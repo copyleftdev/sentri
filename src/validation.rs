@@ -96,7 +96,7 @@ impl DomainValidator {
         let labels: Vec<&str> = domain.split('.').collect();
         
         // TLD must be at least 2 characters
-        if let Some(tld) = labels.last() {
+        if let Some(tld) = labels.iter().next_back() {
             if tld.len() < 2 {
                 return false;
             }
@@ -164,7 +164,7 @@ impl DomainValidator {
         }
         
         // Check for very long TLDs (can indicate generated domains)
-        if let Some(tld) = domain.split('.').last() {
+        if let Some(tld) = domain.split('.').next_back() {
             if tld.len() > 10 {
                 return true;
             }
