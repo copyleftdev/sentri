@@ -254,7 +254,7 @@ impl HttpClientBuilder {
     /// # Arguments
     ///
     /// * `timeout` - The duration after which an idle connection will be closed
-    ///               Set to None to keep connections alive indefinitely (not recommended)
+    ///   Set to None to keep connections alive indefinitely (not recommended)
     ///
     /// # Security Considerations
     ///
