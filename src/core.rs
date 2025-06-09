@@ -25,12 +25,8 @@ use tokio::{
 use tracing::{debug, error, info};
 
 use crate::{
-    dns::DnsResolver,
-    http::HttpClient,
-    rate_limit::RateLimiter,
-    sanitize::sanitize_domain_result,
-    validation::validate_domain,
-    xml::XmlParser,
+    dns::DnsResolver, http::HttpClient, rate_limit::RateLimiter, sanitize::sanitize_domain_result,
+    validation::validate_domain, xml::XmlParser,
 };
 
 /// Results from scanning a domain for MDI presence
@@ -191,7 +187,7 @@ impl MdiChecker {
     /// # async fn example() -> Result<()> {
     /// let checker = MdiChecker::new(5, 10_000)?;
     /// let result = checker.check_domain("example.com").await?;
-    /// 
+    ///
     /// if let Some(tenant) = result.tenant {
     ///     println!("Found tenant: {}", tenant);
     /// }
@@ -204,17 +200,18 @@ impl MdiChecker {
     /// ```
     pub async fn check_domain(&self, domain: &str) -> Result<DomainResult> {
         let start = Instant::now();
-        
+
         if let Some(cached) = self.results_cache.get(domain) {
             debug!("Cache hit for domain: {}", domain);
             return Ok(cached.clone());
         }
 
         let result = self.check_domain_impl(domain, start).await;
-        
+
         if let Ok(ref result) = result {
             if result.error.is_none() {
-                self.results_cache.insert(domain.to_string(), result.clone());
+                self.results_cache
+                    .insert(domain.to_string(), result.clone());
             }
         }
 
@@ -223,7 +220,7 @@ impl MdiChecker {
 
     async fn check_domain_impl(&self, domain: &str, start: Instant) -> Result<DomainResult> {
         debug!("Starting check for domain: {}", domain);
-        
+
         if let Err(validation_error) = validate_domain(domain) {
             error!("Domain validation failed: {}", validation_error);
             return Ok(DomainResult {
@@ -235,7 +232,7 @@ impl MdiChecker {
                 error: Some(validation_error),
             });
         }
-        
+
         let federation_info = match self.get_federation_info(domain).await {
             Ok(info) => info,
             Err(e) => {
@@ -252,7 +249,7 @@ impl MdiChecker {
         };
 
         let tenant = self.extract_tenant(&federation_info.domains);
-        
+
         let mdi_instance = if let Some(ref tenant_name) = tenant {
             self.check_mdi_instance(tenant_name).await
         } else {
@@ -392,9 +389,9 @@ impl MdiChecker {
 
         // Create rate limiter for this batch
         let rate_limiter = Arc::new(RateLimiter::new(
-            rate_limit as usize,      // requests per minute
-            60_000,                    // period of 60 seconds (1 minute)
-            self.concurrent_limit      // max concurrent requests
+            rate_limit as usize,   // requests per minute
+            60_000,                // period of 60 seconds (1 minute)
+            self.concurrent_limit, // max concurrent requests
         ));
 
         // Stream domains from file instead of loading all into memory
@@ -402,83 +399,100 @@ impl MdiChecker {
         let file = File::open(input_file)
             .await
             .context(format!("Failed to open domain file: {:?}", input_file))?;
-        
+
         // Use a generous buffer size for efficiency (64KB)
         let mut reader = BufReader::with_capacity(64 * 1024, file);
         let mut domains_processed = 0;
         let mut current_chunk = Vec::with_capacity(chunk_size);
         let mut line = String::new();
-        
-        info!("Processing domains from {} in streaming mode", input_file.display());
-        
+
+        info!(
+            "Processing domains from {} in streaming mode",
+            input_file.display()
+        );
+
         // Process domains in streaming fashion without loading entire file into memory
         loop {
             line.clear(); // Reuse the string to avoid allocations
             let bytes_read = reader.read_line(&mut line).await?;
-            if bytes_read == 0 { // End of file
+            if bytes_read == 0 {
+                // End of file
                 break;
             }
-            
+
             let domain = line.trim();
             if !domain.is_empty() && !domain.starts_with('#') {
                 current_chunk.push(domain.to_string());
-                
+
                 // When we've collected enough domains, process the chunk
                 if current_chunk.len() >= chunk_size {
                     domains_processed += current_chunk.len();
-                    info!("Processing chunk of {} domains ({} total so far)", current_chunk.len(), domains_processed);
-                    
+                    info!(
+                        "Processing chunk of {} domains ({} total so far)",
+                        current_chunk.len(),
+                        domains_processed
+                    );
+
                     let results = self.process_chunk(&current_chunk, &rate_limiter).await;
-                    
+
                     // Stream results to output immediately as they're available
                     for result in results {
                         // Sanitize the result before outputting it (implements security:output:sanitize_all_output rule)
                         let sanitized_result = sanitize_domain_result(&result);
-                        
+
                         if let Some(ref mut writer) = output_writer {
-                            let json_line = format!("{}
-", serde_json::to_string(&sanitized_result)?);
+                            let json_line = format!(
+                                "{}
+",
+                                serde_json::to_string(&sanitized_result)?
+                            );
                             writer.write_all(json_line.as_bytes()).await?;
                         } else {
                             println!("{}", serde_json::to_string_pretty(&sanitized_result)?);
                         }
                     }
-                    
+
                     // Flush after each chunk to avoid buffering too much data
                     // This follows the streaming IO principle for large datasets
                     if let Some(ref mut writer) = output_writer {
                         writer.flush().await?;
                     }
-                    
+
                     current_chunk.clear();
                 }
             }
         }
-        
+
         // Process any remaining domains in the final chunk
         if !current_chunk.is_empty() {
             info!("Processing final chunk of {} domains", current_chunk.len());
             let results = self.process_chunk(&current_chunk, &rate_limiter).await;
-            
+
             for result in results {
                 // Sanitize the result before outputting it (implements security:output:sanitize_all_output rule)
                 let sanitized_result = sanitize_domain_result(&result);
-            
+
                 if let Some(ref mut writer) = output_writer {
-                    let json_line = format!("{}
-", serde_json::to_string(&sanitized_result)?);
+                    let json_line = format!(
+                        "{}
+",
+                        serde_json::to_string(&sanitized_result)?
+                    );
                     writer.write_all(json_line.as_bytes()).await?;
                 } else {
                     println!("{}", serde_json::to_string_pretty(&sanitized_result)?);
                 }
             }
-            
+
             if let Some(ref mut writer) = output_writer {
                 writer.flush().await?;
             }
         }
-        
-        info!("Batch processing completed, processed {} domains in total", domains_processed + current_chunk.len());
+
+        info!(
+            "Batch processing completed, processed {} domains in total",
+            domains_processed + current_chunk.len()
+        );
         Ok(())
     }
 
@@ -502,17 +516,17 @@ impl MdiChecker {
     ) -> Vec<DomainResult> {
         // Process domains in parallel with rate limiting
         use futures::{stream, StreamExt}; // Import in function scope to avoid conflicts
-        
+
         stream::iter(domains)
             .map(|domain| {
                 let checker = self.clone();
                 let rate_limiter = rate_limiter.clone();
                 let domain = domain.clone();
-                
+
                 async move {
                     // Acquire rate limit permit using our new RateLimiter
                     let permit_result = rate_limiter.acquire().await;
-                    
+
                     // If we fail to acquire a permit, return error result
                     if let Err(e) = permit_result {
                         error!("Failed to acquire rate limit permit: {}", e);
@@ -525,13 +539,13 @@ impl MdiChecker {
                             error: Some(format!("Rate limiting error: {}", e)),
                         };
                     }
-                    
+
                     // Permit successfully acquired, proceed with domain check
                     let _permit = permit_result.unwrap();
                     debug!("Processing domain: {}", domain);
-                    
+
                     let result = checker.check_domain(&domain).await;
-                    
+
                     // Convert Result to DomainResult
                     match result {
                         Ok(domain_result) => domain_result,
@@ -551,10 +565,8 @@ impl MdiChecker {
             .await
     }
 
-
-    
     /// Reads domains from a text file with basic validation
-    /// 
+    ///
     /// This method loads all domains into memory at once. For very large files,
     /// consider using the streaming approach in `process_batch` instead.
     ///
@@ -575,7 +587,7 @@ impl MdiChecker {
         let file = File::open(path)
             .await
             .context(format!("Failed to open domain file: {:?}", path))?;
-            
+
         let reader = BufReader::with_capacity(64 * 1024, file); // 64KB buffer for better performance
         let mut lines = reader.lines();
         let mut domains = Vec::new();

@@ -1,11 +1,11 @@
 #[path = "../src/validation.rs"]
 mod validation;
-use validation::{DomainValidator, validate_domain};
+use validation::{validate_domain, DomainValidator};
 
 #[test]
 fn test_valid_domain_formats() {
     let validator = DomainValidator::new();
-    
+
     // Test valid domain formats
     assert!(validator.validate_domain_format("example.com"));
     assert!(validator.validate_domain_format("sub.example.com"));
@@ -17,7 +17,7 @@ fn test_valid_domain_formats() {
 #[test]
 fn test_invalid_domain_formats() {
     let validator = DomainValidator::new();
-    
+
     // Test invalid domain formats
     assert!(!validator.validate_domain_format("")); // Empty
     assert!(!validator.validate_domain_format(&"x".repeat(254))); // Too long
@@ -35,12 +35,12 @@ fn test_invalid_domain_formats() {
 #[test]
 fn test_suspicious_domains() {
     let validator = DomainValidator::new();
-    
+
     // Suspicious domains
     assert!(validator.is_suspicious("a-b-c-d-e-f.com")); // Too many hyphens
     assert!(validator.is_suspicious("example.abcdefghijklmn")); // Unusual TLD
     assert!(validator.is_suspicious("aaaaaaaaa.com")); // Repeating pattern
-    
+
     // Non-suspicious domains
     assert!(!validator.is_suspicious("example.com"));
     assert!(!validator.is_suspicious("google.com"));
@@ -52,11 +52,11 @@ fn test_validate_domain_function() {
     // Valid domains should return Ok
     assert!(validate_domain("example.com").is_ok());
     assert!(validate_domain("sub.example.com").is_ok());
-    
+
     // Invalid format should return Err with appropriate message
     let err = validate_domain("invalid..domain").unwrap_err();
     assert!(err.contains("Invalid domain format"));
-    
+
     // Suspicious domains should return Err with appropriate message
     let err = validate_domain("a-b-c-d-e-f.com").unwrap_err();
     assert!(err.contains("Suspicious domain"));

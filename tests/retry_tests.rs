@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use sentri::retry::{RetryConfig, with_exponential_backoff};
+use sentri::retry::{with_exponential_backoff, RetryConfig};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
@@ -131,7 +131,7 @@ async fn test_backoff_increases_exponentially() -> Result<()> {
 
     let call_count = Arc::new(AtomicU32::new(0));
     let call_count_clone = call_count.clone();
-    
+
     let start_times = Arc::new(std::sync::Mutex::new(Vec::new()));
     let start_times_clone = start_times.clone();
 
@@ -152,19 +152,22 @@ async fn test_backoff_increases_exponentially() -> Result<()> {
 
     let times = start_times.lock().unwrap();
     assert_eq!(times.len(), 3);
-    
+
     // Check time differences increase (approximation since exact timing is hard to test)
     if times.len() >= 3 {
         let diff1 = times[1].1.duration_since(times[0].1);
         let diff2 = times[2].1.duration_since(times[1].1);
-        
+
         // The second delay should be roughly twice the first (backoff_factor = 2.0)
         // We allow some margin for system timing variations
-        assert!(diff2 > diff1, 
+        assert!(
+            diff2 > diff1,
             "Second delay ({:?}) should be greater than first delay ({:?})",
-            diff2, diff1);
+            diff2,
+            diff1
+        );
     }
-    
+
     Ok(())
 }
 
@@ -180,7 +183,7 @@ async fn test_max_backoff_is_respected() -> Result<()> {
 
     let call_count = Arc::new(AtomicU32::new(0));
     let call_count_clone = call_count.clone();
-    
+
     let start_times = Arc::new(std::sync::Mutex::new(Vec::new()));
     let start_times_clone = start_times.clone();
 
@@ -202,16 +205,19 @@ async fn test_max_backoff_is_respected() -> Result<()> {
         // Initial backoff is 10ms
         // Second should be ~100ms (10 * 10)
         // Third and all subsequent should be capped at 50ms
-        
+
         let diff3 = times[3].1.duration_since(times[2].1);
         let diff4 = times[4].1.duration_since(times[3].1);
-        
+
         // These should be roughly equal since both are capped
         let ratio = diff4.as_millis() as f64 / diff3.as_millis() as f64;
-        assert!(ratio > 0.8 && ratio < 1.2, 
+        assert!(
+            ratio > 0.8 && ratio < 1.2,
             "Fourth delay ({:?}) should be approximately equal to third delay ({:?})",
-            diff4, diff3);
+            diff4,
+            diff3
+        );
     }
-    
+
     Ok(())
 }

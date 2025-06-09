@@ -20,21 +20,21 @@ use tokio::time::sleep;
 use tracing::debug;
 
 /// Configuration for the exponential backoff retry strategy
-/// 
+///
 /// Controls how retry operations are performed, including:
 /// - How many retry attempts are made
 /// - How long to wait between attempts
 /// - How the wait time increases with each attempt
 /// - Whether randomization is applied to prevent coordinated retry storms
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// use sentri::retry::RetryConfig;
-/// 
+///
 /// // Default configuration
 /// let default_config = RetryConfig::default();
-/// 
+///
 /// // Custom configuration
 /// let custom_config = RetryConfig {
 ///     max_retries: 5,
@@ -47,16 +47,16 @@ use tracing::debug;
 pub struct RetryConfig {
     /// Maximum number of retry attempts
     pub max_retries: u32,
-    
+
     /// Initial wait time in milliseconds
     pub initial_backoff_ms: u64,
-    
+
     /// Multiplier for each subsequent retry
     pub backoff_factor: f64,
-    
+
     /// Maximum backoff time in milliseconds
     pub max_backoff_ms: u64,
-    
+
     /// Whether to add jitter to backoff times
     pub add_jitter: bool,
 }
@@ -77,7 +77,7 @@ impl Default for RetryConfig {
 ///
 /// Retries the operation if it fails, with exponentially increasing delays
 /// between attempts. Can optionally add jitter to prevent thundering herd problems.
-/// 
+///
 /// This is the core retry function that implements the backoff algorithm and
 /// handles the retry logic for all retriable operations in the application.
 ///
@@ -101,7 +101,7 @@ impl Default for RetryConfig {
 /// ```
 /// use sentri::retry::{RetryConfig, with_exponential_backoff};
 /// use anyhow::Result;
-/// 
+///
 /// async fn example() -> Result<()> {
 ///     let config = RetryConfig::default();
 ///     
@@ -133,20 +133,20 @@ where
 {
     let mut attempt = 0;
     let mut backoff_ms = config.initial_backoff_ms;
-    
+
     loop {
         let result = operation().await;
-        
+
         match &result {
             Ok(_) => return result,
             Err(err) => {
                 attempt += 1;
-                
+
                 // If we've reached max retries or the error isn't retriable, return the error
                 if attempt >= config.max_retries || !is_retriable(err) {
                     return result;
                 }
-                
+
                 // Calculate next backoff with optional jitter
                 let jitter_ms = if config.add_jitter {
                     let jitter_factor = rand::random::<f64>() * 0.2 + 0.9; // 0.9-1.1 range
@@ -154,19 +154,17 @@ where
                 } else {
                     backoff_ms
                 };
-                
+
                 // Cap at max backoff time
                 let delay = std::cmp::min(jitter_ms, config.max_backoff_ms);
-                
+
                 debug!(
-                    "Retry attempt {}/{} after {}ms delay", 
-                    attempt, 
-                    config.max_retries,
-                    delay
+                    "Retry attempt {}/{} after {}ms delay",
+                    attempt, config.max_retries, delay
                 );
-                
+
                 sleep(Duration::from_millis(delay)).await;
-                
+
                 // Calculate next backoff time
                 backoff_ms = (backoff_ms as f64 * config.backoff_factor) as u64;
                 if backoff_ms > config.max_backoff_ms {

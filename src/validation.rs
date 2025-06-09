@@ -49,13 +49,13 @@ impl DomainValidator {
     }
 
     /// Validates a domain name for format and syntax according to RFC standards
-    /// 
+    ///
     /// This function performs comprehensive RFC-compliant domain validation to ensure
     /// the domain meets all formatting requirements and doesn't contain malformed
     /// components that could lead to security issues.
     ///
     /// # Format Requirements
-    /// 
+    ///
     /// This function checks that the domain:
     /// - Contains at least one dot (.) - RFC 1035 requirement for FQDN
     /// - Has a valid TLD (at least 2 characters)
@@ -66,19 +66,19 @@ impl DomainValidator {
     /// - Each label (part between dots) does not exceed 63 characters (RFC 1035)
     ///
     /// # Security Considerations
-    /// 
+    ///
     /// Domain format validation is critical for security because improper validation
     /// could allow injection attacks or lead to unexpected behavior in DNS resolution.
     /// This implementation enforces strict standards compliance to prevent such issues.
     ///
     /// # Performance Notes
-    /// 
+    ///
     /// The validation is implemented with early returns for efficiency, checking the
     /// most common failure cases first to avoid unnecessary processing. String splitting
     /// is minimized to reduce allocations.
     ///
     /// # Returns
-    /// 
+    ///
     /// * `true` - If the domain meets all format requirements
     /// * `false` - If the domain fails any validation check
     pub fn validate_domain_format(&self, domain: &str) -> bool {
@@ -94,7 +94,7 @@ impl DomainValidator {
 
         // Split by dots to check each label
         let labels: Vec<&str> = domain.split('.').collect();
-        
+
         // TLD must be at least 2 characters
         if let Some(tld) = labels.iter().next_back() {
             if tld.len() < 2 {
@@ -103,57 +103,55 @@ impl DomainValidator {
         } else {
             return false;
         }
-        
+
         // Check each label
         for label in labels {
             // Each label must not exceed 63 characters
             if label.is_empty() || label.len() > 63 {
                 return false;
             }
-            
+
             // Check for valid characters
-            if !label.chars().all(|c| {
-                c.is_ascii_alphanumeric() || c == '-'
-            }) {
+            if !label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
                 return false;
             }
-            
+
             // Labels cannot start or end with hyphen
             if label.starts_with('-') || label.ends_with('-') {
                 return false;
             }
         }
-        
+
         true
     }
-    
+
     /// Checks if a domain appears to be potentially malicious using heuristic analysis
-    /// 
+    ///
     /// This function applies security heuristics to detect potentially suspicious or
     /// malicious domains. These patterns are commonly associated with generated domains
     /// used in phishing, malware distribution, or command-and-control operations.
     ///
     /// # Detection Heuristics
-    /// 
+    ///
     /// Looks for common indicators of suspicious domains:
     /// - Excessive number of hyphens (often used in automatically generated domains)
     /// - Very long TLDs (unusual and often associated with malicious registrations)
     /// - Unusual repeating character patterns (common in algorithm-generated domains)
-    /// 
+    ///
     /// # Security Considerations
-    /// 
+    ///
     /// This detection serves as an early warning system but is not meant to replace
     /// comprehensive security analysis. False positives are possible but are preferred
     /// over false negatives in security-critical applications.
-    /// 
+    ///
     /// # Performance Notes
-    /// 
+    ///
     /// The heuristics are applied in order of computational complexity, with simpler
     /// checks performed first for better performance. The function returns early on
     /// the first suspicious pattern match.
     ///
     /// # Returns
-    /// 
+    ///
     /// * `true` - If suspicious patterns are detected
     /// * `false` - If no suspicious patterns are found
     pub fn is_suspicious(&self, domain: &str) -> bool {
@@ -162,20 +160,20 @@ impl DomainValidator {
         if hyphen_count > 4 {
             return true;
         }
-        
+
         // Check for very long TLDs (can indicate generated domains)
         if let Some(tld) = domain.split('.').next_back() {
             if tld.len() > 10 {
                 return true;
             }
         }
-        
+
         // Check for unusual repeating patterns
         let chars: Vec<char> = domain.chars().collect();
         let mut repeating_count = 0;
-        
+
         for i in 1..chars.len() {
-            if chars[i] == chars[i-1] {
+            if chars[i] == chars[i - 1] {
                 repeating_count += 1;
                 if repeating_count >= 3 {
                     return true;
@@ -184,7 +182,7 @@ impl DomainValidator {
                 repeating_count = 0;
             }
         }
-        
+
         false
     }
 }
@@ -237,15 +235,15 @@ impl DomainValidator {
 /// ```
 pub fn validate_domain(domain: &str) -> Result<(), String> {
     let validator = DomainValidator::new();
-    
+
     if !validator.validate_domain_format(domain) {
         return Err(format!("Invalid domain format: {}", domain));
     }
-    
+
     if validator.is_suspicious(domain) {
         return Err(format!("Suspicious domain detected: {}", domain));
     }
-    
+
     // Domain passed all validation checks
     Ok(())
 }

@@ -1,8 +1,8 @@
-use sentri::sanitize::sanitize_domain_result;
 use anyhow::Result;
 use clap::Parser;
 use sentri::cli::Cli;
 use sentri::core::MdiChecker;
+use sentri::sanitize::sanitize_domain_result;
 use tokio::runtime::Builder;
 use tracing::{debug, info};
 
@@ -17,9 +17,12 @@ fn main() -> Result<()> {
     // Use available_parallelism but cap it at 16 to prevent excessive context switching
     // For IO-heavy workloads like network requests, slightly more threads than cores can be beneficial
     let worker_threads = std::cmp::min(num_cpus + 2, 16);
-    
-    debug!("Configuring Tokio runtime with {} worker threads", worker_threads);
-    
+
+    debug!(
+        "Configuring Tokio runtime with {} worker threads",
+        worker_threads
+    );
+
     let runtime = Builder::new_multi_thread()
         .worker_threads(worker_threads)
         .enable_all()
@@ -43,24 +46,21 @@ async fn async_main() -> Result<()> {
         sentri::cli::Commands::Single { domain } => {
             info!("Checking single domain: {}", domain);
             let result = checker.check_domain(domain).await?;
-            
+
             // Sanitize output before displaying (implements security:output:sanitize_all_output rule)
             let sanitized_result = sanitize_domain_result(&result);
             println!("{}", serde_json::to_string_pretty(&sanitized_result)?);
         }
-        sentri::cli::Commands::Batch { 
-            input_file, 
-            output_file, 
+        sentri::cli::Commands::Batch {
+            input_file,
+            output_file,
             chunk_size,
-            rate_limit 
+            rate_limit,
         } => {
             info!("Processing batch from file: {:?}", input_file);
-            checker.process_batch(
-                input_file, 
-                output_file.as_ref(), 
-                *chunk_size, 
-                *rate_limit
-            ).await?;
+            checker
+                .process_batch(input_file, output_file.as_ref(), *chunk_size, *rate_limit)
+                .await?;
         }
     }
 

@@ -33,15 +33,15 @@
 //! - **Concurrency Control**: Uses semaphores to limit concurrent operations
 //!   (concurrency:use_semaphores_for_concurrency_limits)
 
+use crate::rate_limit::{create_dns_query_limiter, RateLimiter};
+use crate::retry::{with_exponential_backoff, RetryConfig};
 use anyhow::{Context, Result};
 use std::net::IpAddr;
 use std::sync::Arc;
-use trust_dns_resolver::config::ResolverOpts;
-use trust_dns_resolver::TokioAsyncResolver as AsyncResolver;
-use trust_dns_resolver::error::{ResolveError, ResolveErrorKind};
 use tracing::{debug, warn};
-use crate::retry::{RetryConfig, with_exponential_backoff};
-use crate::rate_limit::{RateLimiter, create_dns_query_limiter};
+use trust_dns_resolver::config::ResolverOpts;
+use trust_dns_resolver::error::{ResolveError, ResolveErrorKind};
+use trust_dns_resolver::TokioAsyncResolver as AsyncResolver;
 
 /// DNS resolver with caching, rate limiting, and security features
 ///
@@ -95,7 +95,7 @@ use crate::rate_limit::{RateLimiter, create_dns_query_limiter};
 /// # async fn example() -> anyhow::Result<()> {
 /// // Create a new resolver with default settings
 /// let resolver = DnsResolver::new()?;
-/// 
+///
 /// // Resolve domain with built-in rate limiting and retries
 /// let ips: Vec<IpAddr> = resolver.resolve("example.com").await?;
 /// println!("Resolved IPs: {:?}", ips);
@@ -111,7 +111,7 @@ use crate::rate_limit::{RateLimiter, create_dns_query_limiter};
 ///
 /// # async fn example() -> anyhow::Result<()> {
 /// let resolver = DnsResolver::new()?;
-/// 
+///
 /// // Handle resolution errors with proper context
 /// match resolver.resolve("example.com").await {
 ///     Ok(ips) => println!("Resolved {} IP addresses", ips.len()),
@@ -146,9 +146,9 @@ impl DnsResolver {
     ///   (mdi:domains:rate_limit_domains)
     /// - **Error Handling**: Properly propagates errors with context
     ///   (rust:errors:proper_error_context)
-    /// 
+    ///
     /// # Performance Optimizations
-    /// 
+    ///
     /// - **Optimized Cache Size**: The 1024-entry cache is sized for typical workloads
     ///   while preventing excessive memory usage
     /// - **TTL Management**: Separate TTL configurations for positive and negative
@@ -194,7 +194,7 @@ impl DnsResolver {
         opts.negative_min_ttl = Some(std::time::Duration::from_secs(60));
         opts.timeout = std::time::Duration::from_secs(5);
         opts.attempts = 2;
-        
+
         let resolver = match AsyncResolver::tokio_from_system_conf() {
             Ok(r) => r,
             Err(e) => return Err(anyhow::anyhow!("Failed to create DNS resolver: {}", e)),
@@ -208,25 +208,29 @@ impl DnsResolver {
             max_backoff_ms: 2000,
             add_jitter: true,
         };
-        
+
         // Create rate limiter for DNS queries
         let rate_limiter = Arc::new(create_dns_query_limiter());
 
-        Ok(Self { resolver, retry_config, rate_limiter })
+        Ok(Self {
+            resolver,
+            retry_config,
+            rate_limiter,
+        })
     }
 
     /// Sets a custom rate limiter for the DNS resolver.
-    /// 
+    ///
     /// This method allows configuring a custom rate limiter for specialized
     /// DNS rate limiting needs beyond the default settings. This is useful for
     /// testing scenarios or when specific DNS rate limiting policies need to be respected.
-    /// 
+    ///
     /// # Arguments
     /// * `limiter` - The custom rate limiter to use
-    /// 
+    ///
     /// # Returns
     /// * `Self` - The DNS resolver with custom rate limiter configured
-    /// 
+    ///
     /// # Examples
     /// ```
     /// # use sentri::dns::DnsResolver;
@@ -244,7 +248,7 @@ impl DnsResolver {
         self.rate_limiter = limiter;
         self
     }
-    
+
     /// Resolves a domain name to IP addresses with security features, rate limiting, and retries
     ///
     /// This method performs DNS resolution with comprehensive protections:
@@ -257,7 +261,7 @@ impl DnsResolver {
     ///
     /// # Security Considerations
     ///
-    /// - **Input Validation**: The domain is passed as-is to the DNS resolver, so validate domain 
+    /// - **Input Validation**: The domain is passed as-is to the DNS resolver, so validate domain
     ///   format before passing to this method (security:input:sanitize_all_input)
     /// - **Rate Limiting**: Enforces rate limits to prevent abuse of DNS services and comply
     ///   with external rate limits (mdi:domains:rate_limit_domains)
@@ -283,7 +287,7 @@ impl DnsResolver {
     /// * `Result<Vec<IpAddr>>` - List of resolved IP addresses or error with context
     ///
     /// # Errors
-    /// 
+    ///
     /// This method can return errors in the following cases:
     /// - Rate limit exceeded
     /// - DNS resolution failure (permanent or after maximum retries)
@@ -337,12 +341,12 @@ impl DnsResolver {
     /// ```
     pub async fn resolve(&self, domain: &str) -> Result<Vec<IpAddr>> {
         debug!("Resolving DNS for domain: {}", domain);
-        
+
         // Acquire rate limit permit before proceeding
         debug!("Acquiring DNS rate limit permit");
         let _permit = self.rate_limiter.acquire().await?;
         debug!("DNS rate limit permit acquired, proceeding with resolution");
-        
+
         let domain_copy = domain.to_string();
         let result = with_exponential_backoff(
             || {
@@ -350,7 +354,8 @@ impl DnsResolver {
                 let resolver = &self.resolver;
                 async move {
                     debug!("DNS lookup attempt for {}", domain);
-                    resolver.lookup_ip(&domain)
+                    resolver
+                        .lookup_ip(&domain)
                         .await
                         .context(format!("DNS resolution failed for {}", domain))
                 }
@@ -361,10 +366,10 @@ impl DnsResolver {
                     if let Some(resolve_err) = source.downcast_ref::<ResolveError>() {
                         match resolve_err.kind() {
                             // Temporary failures should be retried
-                            ResolveErrorKind::Timeout | 
-                            ResolveErrorKind::NoRecordsFound { .. } | 
-                            ResolveErrorKind::Proto(_) | 
-                            ResolveErrorKind::Io(_) => {
+                            ResolveErrorKind::Timeout
+                            | ResolveErrorKind::NoRecordsFound { .. }
+                            | ResolveErrorKind::Proto(_)
+                            | ResolveErrorKind::Io(_) => {
                                 warn!("Retriable DNS error: {}, will retry", resolve_err);
                                 return true;
                             }
@@ -380,21 +385,25 @@ impl DnsResolver {
                 warn!("Unknown DNS error: {}, will retry", err);
                 true
             },
-            &self.retry_config
-        ).await?;
-        
+            &self.retry_config,
+        )
+        .await?;
+
         let ips: Vec<IpAddr> = result.iter().collect();
-        
+
         if ips.is_empty() {
-            return Err(anyhow::anyhow!("No IP addresses found for domain: {}", domain));
+            return Err(anyhow::anyhow!(
+                "No IP addresses found for domain: {}",
+                domain
+            ));
         }
 
         debug!("Resolved {} IP addresses for {}", ips.len(), domain);
         Ok(ips)
     }
-    
+
     /// Sets a custom retry configuration for the DNS resolver
-    /// 
+    ///
     /// # Arguments
     /// * `config` - The retry configuration to use
     #[allow(dead_code)]
