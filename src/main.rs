@@ -1,20 +1,10 @@
-use clap::Parser;
+use sentri::sanitize::sanitize_domain_result;
 use anyhow::Result;
-
-use tracing::{info, debug};
+use clap::Parser;
+use sentri::cli::Cli;
+use sentri::core::MdiChecker;
 use tokio::runtime::Builder;
-
-mod cli;
-mod core;
-mod dns;
-mod http;
-mod xml;
-mod validation;
-mod retry;
-mod rate_limit;
-
-use cli::Cli;
-use core::MdiChecker;
+use tracing::{debug, info};
 
 fn main() -> Result<()> {
     // Configure Tokio runtime with appropriate worker threads
@@ -50,12 +40,15 @@ async fn async_main() -> Result<()> {
     let checker = MdiChecker::new(cli.concurrent_requests, cli.timeout_ms)?;
 
     match &cli.command {
-        cli::Commands::Single { domain } => {
+        sentri::cli::Commands::Single { domain } => {
             info!("Checking single domain: {}", domain);
             let result = checker.check_domain(domain).await?;
-            println!("{}", serde_json::to_string_pretty(&result)?);
+            
+            // Sanitize output before displaying (implements security:output:sanitize_all_output rule)
+            let sanitized_result = sanitize_domain_result(&result);
+            println!("{}", serde_json::to_string_pretty(&sanitized_result)?);
         }
-        cli::Commands::Batch { 
+        sentri::cli::Commands::Batch { 
             input_file, 
             output_file, 
             chunk_size,

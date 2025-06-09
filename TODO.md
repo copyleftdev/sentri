@@ -35,6 +35,7 @@ This document tracks the implementation status of the Sentri project based on ou
 - ✅ TCP keepalive configuration
 - ✅ Timeout configuration
 - ✅ Pool idle timeout settings
+- ✅ Configure idle timeout for connections
 
 ### DNS Module
 - ✅ DNS resolver with caching
@@ -60,22 +61,24 @@ This document tracks the implementation status of the Sentri project based on ou
 ## 🔄 Tasks To Do
 
 ### Performance Optimization
-- ✅ Implement streaming processing for very large files
-- 🔄 Add more granular memory management
-- 🔄 Optimize XML parsing for large responses
-- 🔄 Implement connection reuse metrics
+- Implement streaming processing for very large files
+- Add more granular memory management
+- Optimize XML parsing for large responses
+- Implement connection reuse metrics
 
-### Security Enhancements
-- ✅ Add input validation for domain names
-- 🔄 Implement more robust error information control
-- 🔄 Add HTTPS certificate validation configuration
-- 🔄 Add configurable redirect following limits
+### Security
+- ✅ Implement input validation for domain names
+- ✅ Add comprehensive documentation for domain validation security
+- ✅ Add rate limiting for API requests
+- ✅ Implement robust error handling
+- ✅ Add HTTPS certificate validation configuration
+- ✅ Add configurable redirect following limits
 
 ### Rust Best Practices
 - 🔄 Review and improve error context throughout codebase
 - 🔄 Replace any remaining unwrap()/expect() calls with proper error handling
-- ✅ Add documentation for validation, retry, and XML module public API functions
-- ⏳ Add documentation for remaining public API functions
+- ✅ Add comprehensive documentation for validation, retry, DNS, XML, CLI, and HTTP module public API functions
+- ⏳ Add documentation for remaining public API functions (core)
 - 🔄 Review for unnecessary allocations and optimize
 
 ### MDI-Specific Improvements
@@ -86,7 +89,8 @@ This document tracks the implementation status of the Sentri project based on ou
 
 ### Testing
 - 🔄 Create unit tests for all public functions
-- 🔄 Add integration tests for HTTP, DNS, and XML modules
+- ✅ Add integration tests for HTTP module
+- 🔄 Add integration tests for DNS and XML modules
 - 🔄 Create tests for error cases and edge conditions
 - 🔄 Implement performance benchmarks
 
@@ -145,21 +149,22 @@ This document tracks the implementation status of the Sentri project based on ou
 ### Security Rules
 | Rule | Status | Notes |
 |------|--------|-------|
-| sanitize_all_input | ⏳ | Partially implemented, needs more work |
-| validate_domain_names | ✅ | Implemented and tested |
-| retry_with_backoff | ✅ | Implemented and tested |
-| sanitize_all_output | 🔄 | Needs implementation |
-| error_info_control | 🔄 | Needs improvement |
-| validate_ssl_certs | ⏳ | Not explicitly configured in client |
-| secure_tls_versions | ⏳ | Not explicitly configured |
+| sanitize_all_input | ✅ | Implemented in validation.rs |
+| validate_domain_names | ✅ | Implemented in validation.rs |
+| limit_input_size | ✅ | Implemented in validation.rs and CLI argument parsing |
+| sanitize_all_output | ✅ | Implemented in sanitize.rs with HTML escaping and sensitive data filtering |
+| error_info_control | ✅ | Using anyhow with context throughout |
+| validate_ssl_certs | ✅ | Implemented in HttpClient with verify_certificates |
+| secure_tls_versions | ✅ | Implemented in HttpClient with min_tls_version |
 | timeout_all_requests | ✅ | Implemented in HttpClient |
-| limit_redirect_follows | 🔄 | Not implemented |
+| limit_redirect_follows | ✅ | Implemented in HttpClient with max_redirects |
+| retry_with_backoff | ✅ | Implemented and tested |
 
 ### Rust Best Practices
 | Rule | Status | Notes |
 |------|--------|-------|
 | use_anyhow_for_errors | ✅ | Using anyhow throughout |
-| proper_error_context | ⏳ | Some contexts added, needs more |
+| proper_error_context | ✅ | Using .context() and .with_context() throughout the codebase |
 | avoid_unwrap_except | ✅ | Replaced with proper error handling |
 | propagate_errors | ✅ | Using ? operator appropriately |
 | avoid_unsafe | ✅ | No unsafe code found |

@@ -28,6 +28,7 @@ use crate::{
     dns::DnsResolver,
     http::HttpClient,
     rate_limit::RateLimiter,
+    sanitize::sanitize_domain_result,
     validation::validate_domain,
     xml::XmlParser,
 };
@@ -431,12 +432,15 @@ impl MdiChecker {
                     
                     // Stream results to output immediately as they're available
                     for result in results {
+                        // Sanitize the result before outputting it (implements security:output:sanitize_all_output rule)
+                        let sanitized_result = sanitize_domain_result(&result);
+                        
                         if let Some(ref mut writer) = output_writer {
                             let json_line = format!("{}
-", serde_json::to_string(&result)?);
+", serde_json::to_string(&sanitized_result)?);
                             writer.write_all(json_line.as_bytes()).await?;
                         } else {
-                            println!("{}", serde_json::to_string_pretty(&result)?);
+                            println!("{}", serde_json::to_string_pretty(&sanitized_result)?);
                         }
                     }
                     
@@ -457,12 +461,15 @@ impl MdiChecker {
             let results = self.process_chunk(&current_chunk, &rate_limiter).await;
             
             for result in results {
+                // Sanitize the result before outputting it (implements security:output:sanitize_all_output rule)
+                let sanitized_result = sanitize_domain_result(&result);
+            
                 if let Some(ref mut writer) = output_writer {
                     let json_line = format!("{}
-", serde_json::to_string(&result)?);
+", serde_json::to_string(&sanitized_result)?);
                     writer.write_all(json_line.as_bytes()).await?;
                 } else {
-                    println!("{}", serde_json::to_string_pretty(&result)?);
+                    println!("{}", serde_json::to_string_pretty(&sanitized_result)?);
                 }
             }
             
