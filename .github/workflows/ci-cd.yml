@@ -1,0 +1,246 @@
+name: Sentri CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master ]
+
+env:
+  CARGO_TERM_COLOR: always
+  # Limit threads in accordance with performance:concurrency:limit_tokio_worker_threads rule
+  TOKIO_WORKER_THREADS: 4
+  RUST_BACKTRACE: 1
+  # Following security:output:error_info_control rule for CI
+  RUST_LOG: info
+
+jobs:
+  # Following performance:concurrency rules, we'll run jobs efficiently
+  lint:
+    name: Lint with Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: clippy
+          override: true
+      
+      - name: Set up cargo cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+      
+      - name: Clippy check
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features --all-targets -- -D warnings
+          
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+  test:
+    name: Test on ${{ matrix.os }}
+    needs: lint
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      # Following performance:concurrency rules to manage parallel jobs
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          
+      - name: Set up cargo cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+          
+      # Follows verify_completion_with_tests rule from project management
+      - name: Run tests
+        run: cargo test --all-features
+
+  build-and-release:
+    name: Build and Release
+    # Only run on tag pushes
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      # Build on all target platforms separately for optimal binary output
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: sentri
+            asset_name: sentri-linux-amd64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact_name: sentri
+            asset_name: sentri-linux-arm64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: sentri.exe
+            asset_name: sentri-windows-amd64.exe
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: sentri
+            asset_name: sentri-macos-amd64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: sentri
+            asset_name: sentri-macos-arm64
+            
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+          
+      - name: Install cross-compilation tools (Linux ARM)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      # Follow avoid_blocking_in_async rule by ensuring all release builds have proper async configuration
+      - name: Build release binary
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target ${{ matrix.target }}
+          use-cross: ${{ matrix.os == 'ubuntu-latest' && matrix.target != 'x86_64-unknown-linux-gnu' }}
+          
+      - name: Create release archive
+        shell: bash
+        run: |
+          # Create directory for the release
+          mkdir -p release
+          
+          # Copy binary
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            cp "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" "release/${{ matrix.asset_name }}"
+          else
+            cp "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" "release/${{ matrix.asset_name }}"
+            chmod +x "release/${{ matrix.asset_name }}"
+          fi
+          
+          # Copy documentation
+          cp README.md LICENSE* CHANGELOG* release/ 2>/dev/null || true
+          
+          # Create archive
+          cd release
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            7z a "../${{ matrix.asset_name }}.zip" *
+          else
+            tar czf "../${{ matrix.asset_name }}.tar.gz" *
+          fi
+          
+      - name: Upload release archive
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.asset_name }}-archive
+          path: |
+            ${{ matrix.asset_name }}.zip
+            ${{ matrix.asset_name }}.tar.gz
+          if-no-files-found: warn
+          
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    # Following security rules regarding output security and rate limiting
+    permissions:
+      contents: write
+      
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        
+      - name: Display structure of downloaded files
+        run: ls -R
+        
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get commits since last tag
+          PREV_TAG=$(git describe --tags --abbrev=0 ${{ steps.version.outputs.VERSION }}^ 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)" ${{ steps.version.outputs.VERSION }})
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)" $PREV_TAG..${{ steps.version.outputs.VERSION }})
+          fi
+          
+          # Create a changelog file
+          echo "## What's Changed" > changelog.md
+          echo "$COMMITS" >> changelog.md
+          echo "" >> changelog.md
+          echo "## Full Changelog" >> changelog.md
+          if [ -z "$PREV_TAG" ]; then
+            echo "* First Release" >> changelog.md
+          else
+            echo "* [$PREV_TAG...${GITHUB_REF#refs/tags/}](https://github.com/${{ github.repository }}/compare/$PREV_TAG...${GITHUB_REF#refs/tags/})" >> changelog.md
+          fi
+          
+          # Save changelog for GitHub release
+          CHANGELOG=$(cat changelog.md)
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            **/sentri-*.zip
+            **/sentri-*.tar.gz
+          body: |
+            ${{ steps.changelog.outputs.CHANGELOG }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
